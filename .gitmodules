@@ -1,0 +1,3 @@
+[submodule "3rd_party/flash-attention"]
+	path = 3rd_party/flash-attention
+	url = git@github.com:yyihuang/flash-attention.git
