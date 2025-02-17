@@ -1,0 +1,9 @@
+cmake_minimum_required(VERSION 3.18)
+project(test_flash_attn LANGUAGES CXX CUDA)
+
+# Enable verbose output
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
+# Add subdirectories for library and tests
+add_subdirectory(lib)
+add_subdirectory(tests)
