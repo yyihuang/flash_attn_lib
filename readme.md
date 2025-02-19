@@ -50,4 +50,9 @@ git submodule update --init --recursive
 git submodule update --recursive --remote
 ```
 
+# Flash-attn Dependency
+We import cutlass as dependecies for building this library. It is maintained as a submodule under  `3rd_party` from `git@github.com:NVIDIA/cutlass.git`.
+
+
+
 

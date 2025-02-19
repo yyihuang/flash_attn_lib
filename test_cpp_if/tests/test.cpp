@@ -32,7 +32,7 @@ int main() {
     std::optional<at::Tensor> out_;
     std::optional<at::Tensor> alibi_slopes_;
 
-    float p_dropout = 0.1;
+    float p_dropout = 0.0; // disable dropout and thus torch dependency here?
     float softmax_scale = 1.0 / sqrt(head_size);
     bool is_causal = false;
     int window_size_left = -1, window_size_right = -1;

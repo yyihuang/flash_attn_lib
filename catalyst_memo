@@ -1,0 +1,36 @@
+# Envrionment Memo
+The memo to fix environment dependency on Catalyst server.
+
+# nvcc
+Temporarily Add It (For Current Terminal)
+```
+export PATH=/usr/local/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+nvcc --version
+```
+Permanently Add It (For All Sessions)
+```
+echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH'>> ~/.bashrc
+source ~/.bashrc
+```
+
+## LibTorch
+Installation
+```
+wget https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.2.0%2Bcu121.zip
+unzip libtorch-cxx11-abi-shared-with-deps-2.2.0+cu121.zip -d {SOME_PATH}
+```
+To Compile with torch:
+- Set TORCH_DIR for CMake. In CMakeLists.txt:
+```
+set(Torch_DIR "{SOME_PATH}/libtorch/share/cmake/Torch")
+find_package(Torch REQUIRED)
+
+```
+- or
+```
+cmake .. -DCMAKE_PREFIX_PATH="{SOME_PATH}/libtorch"
+```
+
+

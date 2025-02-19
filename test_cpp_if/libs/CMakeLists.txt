@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 3.18)
 project(flash_attn_2_cuda LANGUAGES CXX CUDA)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 # Find required packages
+# set(Torch_DIR "/home/yingyih/workspace/libtorch/share/cmake/Torch")
 find_package(Torch REQUIRED)
+
 find_package(CUDA REQUIRED)
 
 # Define source files
