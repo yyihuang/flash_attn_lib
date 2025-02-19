@@ -16,7 +16,7 @@ find_package(Python COMPONENTS Interpreter Development REQUIRED)
 include_directories(${Python_INCLUDE_DIRS})
 
 # Find MKL dynamically using the Conda environment
-find_package(MKL REQUIRED PATHS $ENV{CONDA_PREFIX} NO_DEFAULT_PATH)
+# find_package(MKL REQUIRED PATHS $ENV{CONDA_PREFIX} NO_DEFAULT_PATH)
 
 # Find NVTX3 (for better compatibility)
 find_package(nvtx3 QUIET)
