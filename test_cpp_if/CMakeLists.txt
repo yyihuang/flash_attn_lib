@@ -8,38 +8,61 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Ensure CUDA Toolkit is found (avoids CMP0146 warning)
-find_package(CUDAToolkit REQUIRED)
-
-# Find Python
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
-include_directories(${Python_INCLUDE_DIRS})
-
-# Find MKL dynamically using the Conda environment
-# find_package(MKL REQUIRED PATHS $ENV{CONDA_PREFIX} NO_DEFAULT_PATH)
-
-# Find NVTX3 (for better compatibility)
-# find_package(nvtx3 QUIET)
-
-# Define CUTLASS path and include directories
-set(CUTLASS_PATH ${CMAKE_SOURCE_DIR}/../3rd_party/cutlass)
-include_directories(${CUTLASS_PATH}/include)
-
-# Find PyTorch (Make sure it is detected properly)
-if (NOT Torch_DIR)
-    set(Torch_DIR ${CMAKE_PREFIX_PATH})
+# --------------------------------------------------------
+# 1. Detect GPU + NVCC to set 'compute_capability'
+#    (Based on your snippet, but done at the top-level so
+#     all subdirectories can use the same setting)
+# --------------------------------------------------------
+find_program(GPU_dev_info nvidia-smi)
+if(NOT GPU_dev_info)
+    message(WARNING "nvidia-smi not found. Assuming compute_capability=80. \
+                     If you have an older GPU, please set it manually.")
+    set(GPU_dev_version "")
+else()
+    execute_process(COMMAND ${GPU_dev_info} OUTPUT_VARIABLE GPU_dev_version)
 endif()
+
+string(REGEX MATCH "H100" GPU_H100 ${GPU_dev_version})
+
+find_program(NVCC nvcc)
+if(NOT NVCC)
+    message(FATAL_ERROR "NVCC not found. Please make sure CUDA Toolkit is installed.")
+endif()
+
+execute_process(COMMAND ${NVCC} --version OUTPUT_VARIABLE NVCC_VERSION_OUTPUT)
+string(REGEX MATCH "([0-9]+\\.[0-9]+)" NVCC_VERSION ${NVCC_VERSION_OUTPUT})
+if(NOT NVCC_VERSION)
+    message(FATAL_ERROR "Failed to determine NVCC version from nvcc --version.")
+endif()
+
+# --------------------------------------------------------
+# 2. Decide which compute capability to use
+# --------------------------------------------------------
+# Default to '80' (Ampere) if not recognized as H100
+set(compute_capability "80")
+if(GPU_H100 AND (NVCC_VERSION GREATER_EQUAL 12))
+    set(compute_capability "90a")
+    add_definitions(-DHOPPER)
+endif()
+
+message(STATUS "Detected compute_capability=${compute_capability}")
+
+# Make it globally visible to subdirectories
+# So that 'libs/CMakeLists.txt' and 'tests/CMakeLists.txt' see it
+set(CMAKE_CUDA_ARCHITECTURES "${compute_capability}" CACHE INTERNAL "")
+
+# --------------------------------------------------------
+# 3. Find PyTorch, Python, etc. if needed at the top-level
+#    (Adjust or remove if you do this in subdirs)
+# --------------------------------------------------------
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(Torch REQUIRED)
 
-# Print debug information
 message(STATUS "Python executable: ${Python_EXECUTABLE}")
-message(STATUS "Python include dir: ${Python_INCLUDE_DIRS}")
-message(STATUS "Python library: ${Python_LIBRARIES}")
-message(STATUS "Torch directory: ${Torch_DIR}")
+message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
 
-# Avoid runtime path issues
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-# Add subdirectories for library and tests
+# --------------------------------------------------------
+# 4. Add the subdirectories
+# --------------------------------------------------------
 add_subdirectory(libs)
 add_subdirectory(tests)

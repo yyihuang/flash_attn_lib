@@ -7,8 +7,14 @@ mkdir build && cd build
 # update the path to be your local libtorch path
 # cmake .. -DCMAKE_PREFIX_PATH="/home/yingyih/workspace/libtorch" (stale)
 export CMAKE_PREFIX_PATH="$CONDA_PREFIX;/home/yingyih/workspace/libtorch"
-cmake .. -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
-make -j
+cmake .. \
+  -GNinja \
+  -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/home/yingyih/workspace/libtorch" \
+  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+  -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
+
+ninja -j$(nproc) # recommend
+make -j$(nproc)
 ```
 [**Recommended**] You might want to build in the container environment from the root directory (provided one for py3.9, cuda12.4, gcc11).
 ```
