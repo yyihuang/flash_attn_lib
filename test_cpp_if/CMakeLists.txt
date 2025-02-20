@@ -19,7 +19,7 @@ include_directories(${Python_INCLUDE_DIRS})
 # find_package(MKL REQUIRED PATHS $ENV{CONDA_PREFIX} NO_DEFAULT_PATH)
 
 # Find NVTX3 (for better compatibility)
-find_package(nvtx3 QUIET)
+# find_package(nvtx3 QUIET)
 
 # Define CUTLASS path and include directories
 set(CUTLASS_PATH ${CMAKE_SOURCE_DIR}/../3rd_party/cutlass)

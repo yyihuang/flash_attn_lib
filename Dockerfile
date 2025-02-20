@@ -34,7 +34,7 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 \
 
 # Upgrade pip and install common Python packages
 RUN python3.10 -m pip install --upgrade pip setuptools wheel \
-    && python3.10 -m pip install numpy scipy pandas tqdm
+    && python3.10 -m pip install numpy scipy pandas tqdm packaging
 
 # Install PyTorch (CUDA 12.4 compatible)
 RUN python3.10 -m pip install torch torchvision torchaudio
@@ -57,6 +57,9 @@ WORKDIR /workspace
 # Set up Torch_DIR for CMake (Fix for ENV error)
 RUN echo "export Torch_DIR=$(python3 -c 'import torch; print(torch.utils.cmake_prefix_path)')" >> ~/.bashrc
 RUN echo "export CMAKE_PREFIX_PATH=\$Torch_DIR:\$CMAKE_PREFIX_PATH" >> ~/.bashrc
+
+# Ensure Python finds user-installed packages
+ENV PYTHONPATH="/home/${USERNAME}/.local/lib/python3.10/site-packages:${PYTHONPATH}"
 
 # Verify installations
 RUN python --version && gcc --version && nvcc --version && whoami

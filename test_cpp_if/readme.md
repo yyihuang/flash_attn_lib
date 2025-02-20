@@ -10,7 +10,7 @@ export CMAKE_PREFIX_PATH="$CONDA_PREFIX;/home/yingyih/workspace/libtorch"
 cmake .. -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
 make -j
 ```
-You might want to build in the container environment from the root directory (provided one for py3.9, cuda12.4, gcc11).
+[**Recommended**] You might want to build in the container environment from the root directory (provided one for py3.9, cuda12.4, gcc11).
 ```
 cd ..
 docker build --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) -t flash_container .
@@ -18,7 +18,8 @@ docker run --gpus all -it --rm --shm-size=8g \
     -v /home/yingyih/workspace:/workspace \
     flash_container
 
-cd workspace/flash_attention_lib/test_cpp_if
+cd flash_attention_lib/test_cpp_if
+rm -rf build
 mkdir build && cd build
 cmake ..
 make -j
