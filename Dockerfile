@@ -9,8 +9,7 @@ RUN apt update && apt install -y \
     build-essential \
     gcc-9 g++-9 \
     cmake \
-    python3-dev python3-pip python3-venv \
-    python3.10-dev \
+    python3.10 python3.10-dev python3-pip python3-venv \
     git wget curl \
     ninja-build \
     libtinfo-dev \
@@ -18,9 +17,11 @@ RUN apt update && apt install -y \
     libncursesw5-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set default GCC version to 9
+# Set default GCC version to 9 (ensures compatibility with cxx11abi=False)
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 100 && \
     update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 100
+ENV CC=/usr/bin/gcc-9
+ENV CXX=/usr/bin/g++-9
 
 # Install Miniconda
 WORKDIR /root
@@ -29,21 +30,25 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_6
     rm Miniconda3.sh
 ENV PATH="/opt/conda/bin:$PATH"
 
-# Create a conda environment
+# Create a conda environment with Python 3.10
 RUN conda create -n flash python=3.10 -y && \
     echo "conda activate flash" >> ~/.bashrc
 ENV CONDA_DEFAULT_ENV=flash
 ENV PATH="/opt/conda/envs/flash/bin:$PATH"
 
-# Install PyTorch (CUDA 12.1, works with CUDA 12.2)
+# Install PyTorch (CUDA 12, Torch 2.2, cxx11abi=False)
 RUN pip install --upgrade pip && \
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-# Install FlashAttention via pip
-RUN pip install flash-attn --no-build-isolation
+# Install FlashAttention from the exact wheel (without renaming)
+RUN wget -P /tmp/ https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl && \
+    pip install /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl --no-build-isolation
 
 # Set working directory inside the container
 WORKDIR /workspace/flash_attention_lib
+
+# Set environment variables for CMake
+ENV CMAKE_PREFIX_PATH="/opt/conda/envs/flash/lib/python3.10/site-packages/torch/"
 
 # Create build directory and run CMake
 # RUN mkdir -p build && cd build && \

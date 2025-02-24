@@ -1,5 +1,9 @@
 # Flash Attention Library Mini
 
+We use this flash-attn release:
+
+https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.
+
 Build the docker at root
 ```
 docker build -t flash-attn-build .
