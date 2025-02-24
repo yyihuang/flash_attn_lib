@@ -1,68 +1,54 @@
-# Use NVIDIA's CUDA 12.4 base image
-FROM nvidia/cuda:12.4.0-devel-ubuntu22.04
+# Use NVIDIA's base image with CUDA 12.2
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
-# Set environment variables for CUDA
-ENV PATH="/usr/local/cuda/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+# Set non-interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Set user information (change this UID/GID as needed)
-ARG USER_ID=2711822
-ARG GROUP_ID=2711822
-ARG USERNAME=flashuser
-
-# Install dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies
+RUN apt update && apt install -y \
     build-essential \
+    gcc-9 g++-9 \
     cmake \
-    git \
-    wget \
-    curl \
-    unzip \
-    pkg-config \
-    libssl-dev \
-    libffi-dev \
-    python3.10 \
-    python3.10-venv \
+    python3-dev python3-pip python3-venv \
     python3.10-dev \
-    python3-pip \
-    gcc-11 g++-11 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    git wget curl \
+    ninja-build \
+    libtinfo-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set GCC 11 as default
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 \
-    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
+# Set default GCC version to 9
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 100
 
-# Upgrade pip and install common Python packages
-RUN python3.10 -m pip install --upgrade pip setuptools wheel \
-    && python3.10 -m pip install numpy scipy pandas tqdm packaging
+# Install Miniconda
+WORKDIR /root
+RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o Miniconda3.sh && \
+    bash Miniconda3.sh -b -p /opt/conda && \
+    rm Miniconda3.sh
+ENV PATH="/opt/conda/bin:$PATH"
 
-# Install PyTorch (CUDA 12.4 compatible)
-RUN python3.10 -m pip install torch torchvision torchaudio
+# Create a conda environment
+RUN conda create -n flash python=3.10 -y && \
+    echo "conda activate flash" >> ~/.bashrc
+ENV CONDA_DEFAULT_ENV=flash
+ENV PATH="/opt/conda/envs/flash/bin:$PATH"
 
-# Set Python 3.10 as default
-RUN ln -sf /usr/bin/python3.10 /usr/bin/python3
-RUN ln -sf /usr/bin/python3.10 /usr/bin/python
+# Install PyTorch (CUDA 12.1, works with CUDA 12.2)
+RUN pip install --upgrade pip && \
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-# Set up a user with the same UID/GID as the host
-RUN groupadd --gid ${GROUP_ID} ${USERNAME} \
-    && useradd --uid ${USER_ID} --gid ${GROUP_ID} --create-home --shell /bin/bash ${USERNAME}
+# Install FlashAttention via pip
+RUN pip install flash-attn --no-build-isolation
 
-# Ensure user has permissions in /workspace
-RUN mkdir -p /workspace && chown -R ${USERNAME}:${USERNAME} /workspace
+# Set working directory inside the container
+WORKDIR /workspace/flash_attention_lib
 
-# Switch to the user
-USER ${USERNAME}
-WORKDIR /workspace
+# Create build directory and run CMake
+# RUN mkdir -p build && cd build && \
+#     cmake .. && \
+#     make -j$(nproc)
 
-# Set up Torch_DIR for CMake (Fix for ENV error)
-RUN echo "export Torch_DIR=$(python3 -c 'import torch; print(torch.utils.cmake_prefix_path)')" >> ~/.bashrc
-RUN echo "export CMAKE_PREFIX_PATH=\$Torch_DIR:\$CMAKE_PREFIX_PATH" >> ~/.bashrc
-
-# Ensure Python finds user-installed packages
-ENV PYTHONPATH="/home/${USERNAME}/.local/lib/python3.10/site-packages:${PYTHONPATH}"
-
-# Verify installations
-RUN python --version && gcc --version && nvcc --version && whoami
-
-# Entry point
-CMD ["/bin/bash"]
+# Set default command
+CMD ["bash"]

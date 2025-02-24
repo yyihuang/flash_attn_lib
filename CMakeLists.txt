@@ -1,0 +1,57 @@
+cmake_minimum_required(VERSION 3.20)
+project(FlashAttnTest)
+
+enable_language(CXX)
+enable_language(CUDA)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+# Find Python
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+
+# Find Python & Torch
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
+# Include Torch
+execute_process(
+    COMMAND ${Python_EXECUTABLE} -c "import torch; print(torch.utils.cmake_prefix_path)"
+    OUTPUT_VARIABLE Torch_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+find_package(Torch REQUIRED PATHS ${Torch_DIR})
+
+include_directories(${Python3_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
+
+# Define test_flash_attn executable BEFORE linking
+add_executable(test_flash_attn test/test.cpp)
+
+# Locate flash-attn shared library
+file(GLOB FLASH_ATTN_LIB "${Python_SITELIB}/flash_attn*.so")
+get_filename_component(FLASH_ATTN_SO ${FLASH_ATTN_LIB} NAME)
+message("FLASH_ATTN_SO: ${FLASH_ATTN_SO}")
+
+# Link directories
+target_include_directories(test_flash_attn
+    PUBLIC "3rd_party/flash-attn/"
+    PUBLIC ${Python3_INCLUDE_DIRS}
+    PUBLIC ${TORCH_INCLUDE_DIRS}
+)
+
+target_link_directories(test_flash_attn
+    PUBLIC ${Python_SITELIB}/torch/lib
+    PUBLIC ${Python_SITELIB}
+)
+
+# Link the required libraries
+target_link_libraries(test_flash_attn PRIVATE
+    ${TORCH_LIBRARIES}  # Link against PyTorch
+    ${Python3_LIBRARIES}  # Link against Python
+    "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions"
+    ":${FLASH_ATTN_SO}"
+)
+
+# Ensure runtime can find the shared library
+set_target_properties(test_flash_attn PROPERTIES
+    BUILD_RPATH "${Python_SITELIB}"
+    INSTALL_RPATH "${Python_SITELIB}"
+)
