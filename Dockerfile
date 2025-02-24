@@ -1,59 +1,56 @@
-# Use NVIDIA's base image with CUDA 12.2
-FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
+# Base Image: Ubuntu 20.04 + CUDA 12.4.1 + cuDNN + NCCL
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu20.04
 
-# Set non-interactive mode
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install system dependencies
-RUN apt update && apt install -y \
-    build-essential \
-    gcc-9 g++-9 \
-    cmake \
-    python3.10 python3.10-dev python3-pip python3-venv \
-    git wget curl \
-    ninja-build \
-    libtinfo-dev \
-    libncurses5-dev \
-    libncursesw5-dev \
+# Install system dependencies: remove linux-tools-common linux-tools-`uname -r` linux-cloud-tools-`uname -r` if not needed
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     sudo wget curl inetutils-ping gdb git gnupg2 vim ca-certificates \
+#     linux-tools-common linux-tools-`uname -r` linux-cloud-tools-`uname -r` \
+#     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sudo wget curl inetutils-ping gdb git gnupg2 vim ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Set default GCC version to 9 (ensures compatibility with cxx11abi=False)
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 100 && \
-    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 100
-ENV CC=/usr/bin/gcc-9
-ENV CXX=/usr/bin/g++-9
+# Install Miniconda and Python 3.10
+RUN wget -c https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /usr/local/miniconda && \
+    rm -rf /tmp/miniconda.sh && \
+    /usr/local/miniconda/bin/conda create -n py310 python=3.10 -y 
 
-# Install Miniconda
-WORKDIR /root
-RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o Miniconda3.sh && \
-    bash Miniconda3.sh -b -p /opt/conda && \
-    rm Miniconda3.sh
-ENV PATH="/opt/conda/bin:$PATH"
+# Set environment variables for Conda
+ENV PATH="/usr/local/miniconda/envs/py310/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64"
+ENV NVIDIA_DISABLE_REQUIRE=1
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# Create a conda environment with Python 3.10
-RUN conda create -n flash python=3.10 -y && \
-    echo "conda activate flash" >> ~/.bashrc
-ENV CONDA_DEFAULT_ENV=flash
-ENV PATH="/opt/conda/envs/flash/bin:$PATH"
+# Install CMake 3.30.1
+RUN pip install --no-cache-dir cmake==3.30.1
 
-# Install PyTorch (CUDA 12, Torch 2.2, cxx11abi=False)
-RUN pip install --upgrade pip && \
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Set working directory
+WORKDIR /workspace
 
-# Install FlashAttention from the exact wheel (without renaming)
-RUN wget -P /tmp/ https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl && \
-    pip install /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl --no-build-isolation
+# Download and install FlashAttention 2.7.4.post1 for CUDA 12 and Torch 2.2
+RUN wget -O /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl \
+    https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.0.post2/flash_attn-2.7.0.post2+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl && \
+    pip install /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl --no-build-isolation && \
+    rm -rf /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 
-# Set working directory inside the container
-WORKDIR /workspace/flash_attention_lib
+# Install PyTorch (CUDA 12, Torch 2.2)
+# RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-# Set environment variables for CMake
-ENV CMAKE_PREFIX_PATH="/opt/conda/envs/flash/lib/python3.10/site-packages/torch/"
+# Install other dependencies
+RUN pip install --no-cache-dir ninja
 
-# Create build directory and run CMake
-# RUN mkdir -p build && cd build && \
-#     cmake .. && \
-#     make -j$(nproc)
+# Set up CMake environment variables
+ENV CMAKE_PREFIX_PATH="/usr/local/miniconda/envs/py310/lib/python3.10/site-packages/torch/"
 
-# Set default command
+# Uncomment if you need to build from source
+# COPY . /workspace/flash_attention_lib
+# WORKDIR /workspace/flash_attention_lib
+# RUN mkdir -p build && cd build && cmake .. && make -j$(nproc)
+
+# Set default working directory
+WORKDIR /app
+
+# Default to interactive mode
 CMD ["bash"]
