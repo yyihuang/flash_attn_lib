@@ -1,4 +1,4 @@
-# Flash Attention Library
+# Flash Attention Library Mini
 
 Build the docker at root
 ```
@@ -10,7 +10,18 @@ Run it in docker:
 docker run --gpus all --rm -it -v /home/yingyih/workspace:/workspace --user $(id -u):$(id -g) flash-attn-build
 ```
 
--- stale--
+Try to build in docker:
+```
+mkdir -p build && cd build
+cmake ..
+make -j
+```
+
+
+
+
+
+------------------------- stale----------------------------
 
 This repo tries to encapsulate the flash attention official implementation (under `3rd_party` dir) as a library module. This library module could be kept updated as an individual git submodule.
 
