@@ -1,25 +1,48 @@
-# Flash Attention Library Mini
+# Flash Attention Library Minimal Demo
+## Link with Pre-compiled Wheel
+
+I worked on catalyst-0-15 with this docker image.
 
 We use this flash-attn release:
 
-https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.
+https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.0.post2/flash_attn-2.7.0.post2+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl instead of local building for now. 
 
-Build the docker at root
+For linking with extracted interface, we must ensure consistent dependencies between flash-attn wheel and local environment. Here we provide a comptiable building environment in docker.
+
+Build the docker with image at at root. You could examine all the dependencies in it.
 ```
 docker build -t flash-attn-build .
 ```
 
-Run it in docker:
+Run it in docker. (update local workspace to map as needed)
 ```
 docker run --gpus all --rm -it -v /home/yingyih/workspace:/workspace --user $(id -u):$(id -g) flash-attn-build
 ```
 
-Try to build in docker:
+Try to build in docker at root dir.
 ```
 mkdir -p build && cd build
 cmake ..
 make -j
 ```
+
+Run the test:
+```
+export LD_LIBRARY_PATH=/usr/local/miniconda/envs/py310/lib/python3.10/site-packages/torch/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/local/miniconda/envs/py310/lib/python3.10/site-packages:$LD_LIBRARY_PATH
+./test_flash_attn
+```
+
+## Usgae: Exposed Interface
+Referenced Practice:  https://github.com/zhihu/ZhiLight/tree/main/3rd/flash_decoding
+
+- Flash-attn Lib Interface
+
+We put the required interfaces from flash-attn wheel under `3rd_party/flash-attn/flash_api.h`. (Ignore `3rd_party/flash-attention`. This is for local compilation of flash-attn).
+
+- Integrated Function Interface
+
+Put the FlexLLM-compatible interface declaraiton under `csrc/flash_attn.h` and implementation under `csrc/flash_attn.cpp` (where we invoked the flash-attn lib API).
 
 
 
