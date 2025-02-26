@@ -1,7 +1,16 @@
 # Flash Attention Library Minimal Demo
+
+The demo is to demonstrate how we link the pre-compiled flash-attn wheel can be linked with your code on interface `run_mha_fwd` and `run_mha_bwd`. It also gives local compilation configurations in case you need to pull the lastest updates on flash-attn source and build it locally as a 3rd-party dependency.
+
 ## Link with Pre-compiled Wheel
 
-I worked on catalyst-0-15 with this docker image.
+The exported API should be declared in `3rd_party/flash_api.h`. The signature should be consistent with the one in source code. 
+
+You could try to have you own APIs declared in `csrc/flash_attn.h`, and implement them with the pre-compiled flash-attn functions by `#include "flash_api.h"` in `csrc/flash_attn.cpp`.
+
+I make two minimal tests under `test`, for `run_mha_fwd` and `run_mha_bwd`.
+
+I worked on catalyst-0-15 with docker image flash-attn-build.
 
 We use this flash-attn release:
 
@@ -30,11 +39,13 @@ Run the test:
 ```
 export LD_LIBRARY_PATH=/usr/local/miniconda/envs/py310/lib/python3.10/site-packages/torch/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/usr/local/miniconda/envs/py310/lib/python3.10/site-packages:$LD_LIBRARY_PATH
-./test_flash_attn
+./test_[TARGET]
 ```
 
 ## Usgae: Exposed Interface
 Referenced Practice:  https://github.com/zhihu/ZhiLight/tree/main/3rd/flash_decoding
+
+Here is the directory structure as said in last section.
 
 - Flash-attn Lib Interface
 
@@ -48,7 +59,7 @@ Put the FlexLLM-compatible interface declaraiton under `csrc/flash_attn.h` and i
 
 
 
-------------------------- stale----------------------------
+------------------------- In case you need to build it locally----------------------------
 
 This repo tries to encapsulate the flash attention official implementation (under `3rd_party` dir) as a library module. This library module could be kept updated as an individual git submodule.
 
