@@ -6,14 +6,30 @@
 
 void print_tensor_values(const at::Tensor &tensor, const std::string &name, int num_elements = 5)
 {
-    at::Tensor tensor_cpu = tensor.to(torch::kCPU, torch::kFloat);
+    at::Tensor tensor_cpu = tensor.to(torch::kCPU, torch::kFloat); // Convert to float32 for printing
     std::cout << name << " (first " << num_elements << " values): ";
-    auto accessor = tensor_cpu.accessor<float, 4>();
 
-    for (int i = 0; i < num_elements && i < tensor_cpu.numel(); ++i)
-    {
-        std::cout << std::fixed << std::setprecision(5) << accessor[0][0][0][i] << " ";
+    if (tensor.dim() == 4)
+    { // Standard Q, K, V, Output tensors
+        auto accessor = tensor_cpu.accessor<float, 4>();
+        for (int i = 0; i < num_elements && i < tensor_cpu.numel(); ++i)
+        {
+            std::cout << std::fixed << std::setprecision(5) << accessor[0][0][0][i] << " ";
+        }
     }
+    else if (tensor.dim() == 3)
+    { // Softmax LSE (batch_size, num_heads, seqlen_q)
+        auto accessor = tensor_cpu.accessor<float, 3>();
+        for (int i = 0; i < num_elements && i < tensor_cpu.numel(); ++i)
+        {
+            std::cout << std::fixed << std::setprecision(5) << accessor[0][0][i] << " ";
+        }
+    }
+    else
+    {
+        std::cerr << "Unsupported tensor dimension: " << tensor.dim() << std::endl;
+    }
+
     std::cout << std::endl;
 }
 
@@ -130,6 +146,9 @@ int main()
 
         // Print output tensor values after running FlashAttention
         print_tensor_values(out, "Output Tensor (after FlashAttention)");
+
+        // Print softmax_lse values
+        print_tensor_values(softmax_lse, "Softmax LSE");
     }
     catch (const c10::Error &e)
     {

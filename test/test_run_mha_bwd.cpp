@@ -1,7 +1,8 @@
 #include <torch/torch.h>
 #include <torch/extension.h>
+#include <cuda_runtime.h>
+
 #include <iostream>
-#include <iomanip> // For formatted printing
 #include "flash_api.h"
 
 #define CHECK_CUDA_ERRORS()                                                                                               \
@@ -50,66 +51,31 @@ int main()
         std::cout << "CUDA available: " << torch::cuda::is_available() << std::endl;
         std::cout << "CUDNN available: " << torch::cuda::cudnn_is_available() << std::endl;
 
-        // Define tensor dimensions
-        int batch_size = 2;
-        int seqlen_q = 16;
-        int seqlen_k = 16;
-        int num_heads = 8;
-        int num_heads_k = 8; // Same as num_heads for standard MHA
-        int head_size = 64;
+        int batch_size = 2, seqlen_q = 16, seqlen_k = 16;
+        int num_heads = 8, num_heads_k = 8, head_size = 64;
 
-        // Ensure head_size is a multiple of 8
         if (head_size % 8 != 0)
-        {
             throw std::runtime_error("head_size must be a multiple of 8");
-        }
 
-        // Create input tensors on CUDA with half precision (float16)
+        // Forward Pass: Allocate input tensors
+        // q size: (batch_size, seqlen_q, num_heads, head_size)
+        // k size: (batch_size, seqlen_k, num_heads_k, head_size)
+        // v size: (batch_size, seqlen_k, num_heads_k, head_size)
         at::Tensor q = torch::randn({batch_size, seqlen_q, num_heads, head_size},
                                     torch::dtype(torch::kFloat16).device(torch::kCUDA));
         at::Tensor k = torch::randn({batch_size, seqlen_k, num_heads_k, head_size},
                                     torch::dtype(torch::kFloat16).device(torch::kCUDA));
         at::Tensor v = torch::randn({batch_size, seqlen_k, num_heads_k, head_size},
                                     torch::dtype(torch::kFloat16).device(torch::kCUDA));
+        std::cout << "Q Tensor Shape: " << q.sizes() << std::endl;
+        std::cout << "K Tensor Shape: " << k.sizes() << std::endl;
+        std::cout << "V Tensor Shape: " << v.sizes() << std::endl;
 
-        // Output tensor for forward pass
+        // Forward pass output tensors
         at::Tensor out = torch::empty_like(q);
-
-        // Softmax LSE tensor (log-sum-exp)
         at::Tensor softmax_lse = torch::empty({batch_size, num_heads, seqlen_q},
                                               torch::dtype(torch::kFloat).device(torch::kCUDA));
 
-        // Checking in original code
-        {
-            auto q_dtype = q.dtype();
-            TORCH_CHECK(q_dtype == torch::kFloat16 || q_dtype == torch::kBFloat16,
-                        "FlashAttention only support fp16 and bf16 data type");
-            TORCH_CHECK(k.dtype() == q_dtype, "query and key must have the same dtype");
-            TORCH_CHECK(v.dtype() == q_dtype, "query and value must have the same dtype");
-
-            CHECK_DEVICE(q);
-            CHECK_DEVICE(k);
-            CHECK_DEVICE(v);
-
-            TORCH_CHECK(q.stride(-1) == 1, "Input tensor must have contiguous last dimension");
-            TORCH_CHECK(k.stride(-1) == 1, "Input tensor must have contiguous last dimension");
-            TORCH_CHECK(v.stride(-1) == 1, "Input tensor must have contiguous last dimension");
-
-            const auto sizes = q.sizes();
-
-            const int batch_size = sizes[0];
-            int seqlen_q = sizes[1];
-            int num_heads = sizes[2];
-            const int head_size = sizes[3];
-            const int seqlen_k = k.size(1);
-            const int num_heads_k = k.size(2);
-            TORCH_CHECK(batch_size > 0, "batch size must be positive");
-            TORCH_CHECK(head_size <= 256, "FlashAttention forward only supports head dimension at most 256");
-            TORCH_CHECK(head_size % 8 == 0, "query, key, value, and out_ must have a head_size that is a multiple of 8");
-            TORCH_CHECK(num_heads % num_heads_k == 0, "Number of heads in key/value must divide number of heads in query");
-        }
-
-        // Forward pass
         std::cout << "Running FlashAttention Forward..." << std::endl;
         Flash_fwd_params fwd_params;
         set_params_fprop(fwd_params,
@@ -123,7 +89,7 @@ int main()
                          softmax_lse.data_ptr(),
                          0.0f,                        // p_dropout = 0
                          1.0f / std::sqrt(head_size), // softmax scale
-                         -1, -1,                      // window_size_left, window_size_right (no local attention)
+                         -1, -1,                      // window_size_left, window_size_right
                          1.0f                         // softcap
         );
 
@@ -131,81 +97,76 @@ int main()
         run_mha_fwd(fwd_params, stream);
         torch::cuda::synchronize();
 
-        // Print forward output
+        // Store `out` (Python: out_padded) for backward pass
+        // out size: (batch_size, seqlen_q, num_heads, head_size)
+
+        std::cout << "Output Tensor Shape: " << out.sizes() << std::endl;
+        std::cout << "Softmax LSE Shape: " << softmax_lse.sizes() << std::endl;
+
         print_tensor_values(out, "Output Tensor (after Forward)");
         print_tensor_values(softmax_lse, "Softmax LSE");
 
-        // Backward pass preparation
+        // Backward Pass: Create dout, ensuring alignment with PyTorch behavior
         at::Tensor dout = torch::randn({batch_size, seqlen_q, num_heads, head_size},
                                        torch::dtype(torch::kFloat16).device(torch::kCUDA));
 
+        // Handle padding for dout_padded (Python equivalent)
+        int pad_size = head_size % 8 == 0 ? 0 : (8 - head_size % 8);
+        at::Tensor dout_padded = dout;
+        if (pad_size > 0)
+        {
+            dout_padded = torch::cat({dout, torch::zeros({batch_size, seqlen_q, num_heads, pad_size},
+                                                         torch::dtype(torch::kFloat16).device(torch::kCUDA))},
+                                     -1);
+        }
+
+        // print the size of dout_padded
+        std::cout << "dout_padded Tensor Shape: " << dout_padded.sizes() << std::endl;
+
+        // Allocate gradient tensors
         at::Tensor dq = torch::empty_like(q);
         at::Tensor dk = torch::empty_like(k);
         at::Tensor dv = torch::empty_like(v);
 
-        {
-            auto q_dtype = q.dtype();
-            TORCH_CHECK(q_dtype == torch::kFloat16 || q_dtype == torch::kBFloat16,
-                        "FlashAttention only support fp16 and bf16 data type");
-            TORCH_CHECK(k.dtype() == q_dtype, "query and key must have the same dtype");
-            TORCH_CHECK(v.dtype() == q_dtype, "query and value must have the same dtype");
-            TORCH_CHECK(out.dtype() == q_dtype, "query and out must have the same dtype");
-            TORCH_CHECK(dout.dtype() == q_dtype, "query and dout must have the same dtype");
+        std::cout << "Running FlashAttention Backward..." << std::endl;
 
-            CHECK_DEVICE(q);
-            CHECK_DEVICE(k);
-            CHECK_DEVICE(v);
-            CHECK_DEVICE(out);
-            CHECK_DEVICE(dout);
-            CHECK_DEVICE(softmax_lse);
-
-            TORCH_CHECK(q.stride(-1) == 1, "Input tensor must have contiguous last dimension");
-            TORCH_CHECK(k.stride(-1) == 1, "Input tensor must have contiguous last dimension");
-            TORCH_CHECK(v.stride(-1) == 1, "Input tensor must have contiguous last dimension");
-            TORCH_CHECK(out.stride(-1) == 1, "out tensor must have contiguous last dimension");
-            TORCH_CHECK(dout.stride(-1) == 1, "dout tensor must have contiguous last dimension");
-
-            const auto sizes = q.sizes();
-
-            const int batch_size = sizes[0];
-            const int seqlen_q = sizes[1];
-            const int num_heads = sizes[2];
-            const int head_size = sizes[3];
-            const int seqlen_k = k.size(1);
-            const int num_heads_k = k.size(2);
-            TORCH_CHECK(batch_size > 0, "batch size must be positive");
-            TORCH_CHECK(head_size % 8 == 0, "head_size should be a multiple of 8");
-            TORCH_CHECK(head_size <= 256, "FlashAttention backward only supports head dimension at most 256");
-            TORCH_CHECK(num_heads % num_heads_k == 0, "Number of heads in key/value must divide number of heads in query");
-        }
-
-        // Run backward pass
+        // Set backward parameters
         Flash_bwd_params bwd_params;
         set_params_dgrad(bwd_params,
-                         batch_size,
-                         seqlen_q, seqlen_k,
+                         batch_size, seqlen_q, seqlen_k,
                          seqlen_q, seqlen_k, // Rounded lengths
                          num_heads, num_heads_k,
                          head_size, head_size, // Rounded head_size
                          q, k, v, out,
-                         dout, dq, dk, dv,
-                         nullptr, nullptr,            // cu_seqlens_q_d, cu_seqlens_k_d
-                         nullptr, nullptr, nullptr,   // dq_accum_d, dk_accum_d, dv_accum_d
-                         softmax_lse.data_ptr(),      // softmax_lse_d
+                         dout_padded, dq, dk, dv,
+                         nullptr, nullptr, // cu_seqlens_q_d, cu_seqlens_k_d
+                         nullptr, nullptr, nullptr, // dq_accum_d, dk_accum_d, dv_accum_d
+                         softmax_lse.data_ptr(),
                          nullptr,                     // dsoftmax_sum_d
                          0.0f,                        // p_dropout = 0
                          1.0f / std::sqrt(head_size), // softmax scale
-                         -1, -1,                      // window_size_left, window_size_right (no local attention)
+                         -1, -1,                      // window_size_left, window_size_right
                          1.0f,                        // softcap
                          false,                       // deterministic
                          false                        // unpadded_lse
         );
 
-        std::cout << "Running FlashAttention Backward..." << std::endl;
-        torch::cuda::synchronize();
         run_mha_bwd(bwd_params, stream);
         torch::cuda::synchronize();
         CHECK_CUDA_ERRORS();
+
+        // Trim dq, dk, dv (equivalent to `dq[..., :dout.shape[-1]]` in Python)
+        if (pad_size > 0)
+        {
+            dq = dq.index({"...", torch::indexing::Slice(0, head_size)});
+            dk = dk.index({"...", torch::indexing::Slice(0, head_size)});
+            dv = dv.index({"...", torch::indexing::Slice(0, head_size)});
+        }
+
+        // Print the size of dq, dk, dv
+        std::cout << "dq Tensor Shape: " << dq.sizes() << std::endl;
+        std::cout << "dk Tensor Shape: " << dk.sizes() << std::endl;
+        std::cout << "dv Tensor Shape: " << dv.sizes() << std::endl;
 
         // Print output gradients
         print_tensor_values(dq, "dQ (Gradient of Q)");
