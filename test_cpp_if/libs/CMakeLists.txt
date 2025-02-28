@@ -10,6 +10,7 @@ set(CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set_source_files_properties(${CUDA_SOURCES} PROPERTIES LANGUAGE CUDA)
 
 # ------------------------------------------------------------
 # 1. Find Python (Interpreter + Development headers)
@@ -20,12 +21,19 @@ find_package(CUDA REQUIRED)
 
 # ------------------------------------------------------------
 # 2. Define the .cu files
+# (we only compile the needed .cu files)
 # ------------------------------------------------------------
-file(GLOB_RECURSE CUDA_SOURCES
-    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/*.cu
+set(CUDA_SOURCES
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim32_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim32_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim32_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim32_fp16_causal_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim32_fp16_causal_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim32_fp16_causal_sm80.cu
 )
 
-set(CPP_SOURCE ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/flash_api.cpp)
+# set(CPP_SOURCE ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/flash_api.cpp)
+set(CPP_SOURCE ${CMAKE_SOURCE_DIR}/../3rd_party/flexflow-flash-attention/flash_api.cpp)
 
 # ------------------------------------------------------------
 # 3. Create the shared library target

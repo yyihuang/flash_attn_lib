@@ -27,7 +27,14 @@ docker run --gpus all -it --rm --shm-size=8g \
 cd flash_attention_lib/test_cpp_if
 rm -rf build
 mkdir build && cd build
+
+cmake .. \
+  -GNinja \
+  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+  -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
+// or
 cmake ..
+
 make -j
 ```
 

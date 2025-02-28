@@ -50,7 +50,7 @@ ENV CMAKE_PREFIX_PATH="/usr/local/miniconda/envs/py310/lib/python3.10/site-packa
 # RUN mkdir -p build && cd build && cmake .. && make -j$(nproc)
 
 # Set default working directory
-WORKDIR /app
+WORKDIR /workspace
 
 # Default to interactive mode
 CMD ["bash"]

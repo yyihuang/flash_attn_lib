@@ -1,23 +1,23 @@
 cmake_minimum_required(VERSION 3.18)
 project(test_flash_attn LANGUAGES CXX)
 
-# Find Python again to ensure variables are available
+# Find Dependencies
 find_package(Python COMPONENTS Development REQUIRED)
-
-# Find PyTorch
 find_package(Torch REQUIRED)
 
-# Example test
+# Create executable
 add_executable(test_flash_api test.cpp)
 
-# Link and include settings
+# Link test executable with the shared library
 target_link_libraries(test_flash_api PRIVATE
     flash_attn_2_cuda
     ${TORCH_LIBRARIES}
-    ${Python_LIBRARIES}  # Explicitly link Python libs
+    ${Python_LIBRARIES}
 )
 
+# Include directories
 target_include_directories(test_flash_api PRIVATE
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flexflow-flash-attention
     ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn
     ${TORCH_INCLUDE_DIRS}
     ${Python_INCLUDE_DIRS}  # Critical for Python.h
