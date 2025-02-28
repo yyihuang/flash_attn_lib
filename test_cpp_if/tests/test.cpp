@@ -5,21 +5,6 @@
 #include "../../3rd_party/flexflow-flash-attention/flexflow_flash_api.h"
 using namespace flash;
 
-// extern std::vector<at::Tensor> mha_fwd(
-//     at::Tensor &q,
-//     const at::Tensor &k,
-//     const at::Tensor &v,
-//     std::optional<at::Tensor> &out_,
-//     std::optional<at::Tensor> &alibi_slopes_,
-//     const float p_dropout,
-//     const float softmax_scale,
-//     bool is_causal,
-//     int window_size_left,
-//     int window_size_right,
-//     const float softcap,
-//     const bool return_softmax,
-//     std::optional<at::Generator> gen_
-// );
 
 int main()
 {

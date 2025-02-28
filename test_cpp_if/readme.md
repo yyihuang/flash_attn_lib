@@ -39,7 +39,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug
 make -j
 ```
 
-TODO: building nvcc OOM issues
+TODO: building nvcc OOM issues --> fix by allocating more cpu tasks on slurm and using ninja build.
 
 # Run the Test with Shared Library
 ```
