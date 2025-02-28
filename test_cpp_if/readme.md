@@ -34,6 +34,7 @@ cmake .. \
   -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
 // or
 cmake ..
+cmake .. -DCMAKE_BUILD_TYPE=Debug
 
 make -j
 ```
