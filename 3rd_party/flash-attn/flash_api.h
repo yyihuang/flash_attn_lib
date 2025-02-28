@@ -36,7 +36,27 @@ mha_fwd(at::Tensor &q,                            // batch_size x seqlen_q x num
         const float softcap,
         const bool return_softmax,
         std::optional<at::Generator> gen_);
-
+        
+std::vector<at::Tensor>
+mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x multiple_of(head_size_og, 8)
+        const at::Tensor &q,   // batch_size x seqlen_q x num_heads x head_size
+        const at::Tensor &k,   // batch_size x seqlen_k x num_heads_k x head_size
+        const at::Tensor &v,   // batch_size x seqlen_k x num_heads_k x head_size
+        const at::Tensor &out,   // batch_size x seqlen_q x num_heads x head_size
+        const at::Tensor &softmax_lse,     // b x h x seqlen_q
+        std::optional<at::Tensor> &dq_,   // batch_size x seqlen_q x num_heads x head_size
+        std::optional<at::Tensor> &dk_,   // batch_size x seqlen_k x num_heads_k x head_size
+        std::optional<at::Tensor> &dv_,   // batch_size x seqlen_k x num_heads_k x head_size
+        std::optional<at::Tensor> &alibi_slopes_, // num_heads or batch_size x num_heads
+        const float p_dropout,         // probability to drop
+        const float softmax_scale,
+        const bool is_causal,
+        int window_size_left,
+        int window_size_right,
+        const float softcap,
+        const bool deterministic,
+        std::optional<at::Generator> gen_,
+        std::optional<at::Tensor> &rng_state);
 // API-1: run_mha_fwd and num_splits_heuristic (adapted from ZhiLight open-source engine)
 // plus: set_params_fprop (need for `test/test_run_mha_fwd.cpp`)
 
