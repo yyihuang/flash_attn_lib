@@ -118,10 +118,10 @@ make -j
 
 This repo tries to encapsulate the flash attention official implementation (under `3rd_party` dir) as a library module. This library module could be kept updated as an individual git submodule.
 
-## Flash Attention Submodules
+### Flash Attention Submodules
 This official implementation (https://github.com/Dao-AILab/flash-attention.git) is maintained by git submodules in this library. Here we will review how we perform updates and syncs with this submodule.
 
-## Cloning this Repo with Flash-attn Submodules
+#### Cloning this Repo with Flash-attn Submodules
 To clone this repo:
 ```
 git clone --recurse-submodules git@github.com:yyihuang/flash_attn_lib.git
@@ -132,7 +132,7 @@ In case you forgot to clone with `--resurse-submodules`:
 git submodule update --init --recursive
 ```
 
-## Use a Commit ID with the Flash-attn Submodules
+#### Use a Commit ID with the Flash-attn Submodules
 If the official flash-attention repo gets updates, you can pull the latest changes:
 ```
 cd 3rd_party/attention
@@ -167,7 +167,7 @@ git submodule update --init --recursive
 git submodule update --recursive --remote
 ```
 
-# Flash-attn Dependency
+### Flash-attn Dependency
 We import cutlass as dependecies for building this library. It is maintained as a submodule under  `3rd_party` from `git@github.com:NVIDIA/cutlass.git`.
 
 
