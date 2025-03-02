@@ -114,6 +114,11 @@ void print_tensor_values(const at::Tensor &tensor, const std::string &name, int 
     std::cout << std::endl;
 }
 
+// To pass raw data pointer (on-device) to at::Tensor interface without copying
+// Refer this: torch::from_blob
+// https://pytorch.org/cppdocs/api/function_namespacetorch_1ad7fb2a7759ef8c9443b489ddde494787.html
+// raw data should stay valid during the lifetime of the tensor
+// copy or ownership tranfer: use tensor = tensor.clone();
 int main()
 {
     try
@@ -283,9 +288,6 @@ int main()
             q = q.transpose(1, 2).reshape({batch_size, 1, num_heads_k * seqlen_q, head_size});
             softmax_lse = softmax_lse.reshape({batch_size, num_heads_k * seqlen_q, 1});
         }
-
-        // Store `out` (Python: out_padded) for backward pass
-        // out size: (batch_size, seqlen_q, num_heads, head_size)
 
         std::cout << "Output Tensor Shape: " << out.sizes() << std::endl;
         std::cout << "Softmax LSE Shape: " << softmax_lse.sizes() << std::endl;

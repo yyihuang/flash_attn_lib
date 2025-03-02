@@ -5,7 +5,11 @@
 #include "flash_api.h"
 
 
-
+// To pass raw data pointer (on-device) to at::Tensor interface without copying
+// Refer this: torch::from_blob
+// https://pytorch.org/cppdocs/api/function_namespacetorch_1ad7fb2a7759ef8c9443b489ddde494787.html
+// raw data should stay valid during the lifetime of the tensor
+// copy or ownership tranfer: use tensor = tensor.clone();
 int main()
 {
     int batch_size = 2, seqlen_q = 16, seqlen_k = 16;
