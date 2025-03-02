@@ -9,7 +9,7 @@
 int main()
 {
     int batch_size = 2, seqlen_q = 16, seqlen_k = 16;
-    int num_heads = 8, head_size = 32; // hdim=32
+    int num_heads = 8, head_size = 128; // hdim=32
 
     // Ensure FP16 (half precision)
     at::Tensor q = torch::randn({batch_size, seqlen_q, num_heads, head_size},
@@ -29,7 +29,7 @@ int main()
     bool is_causal = false;
     int window_size_left = -1, window_size_right = -1;
     float softcap = 0.0;
-    bool return_softmax = true; // return for bwd
+    bool return_softmax = true; // Do not return softmax LSE
     std::optional<at::Generator> gen_;
 
     // Forward pass
