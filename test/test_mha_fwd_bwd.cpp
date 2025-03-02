@@ -29,7 +29,7 @@ int main()
     bool is_causal = false;
     int window_size_left = -1, window_size_right = -1;
     float softcap = 0.0;
-    bool return_softmax = true; // Do not return softmax LSE
+    bool return_softmax = true; // return for bwd
     std::optional<at::Generator> gen_;
 
     // Forward pass

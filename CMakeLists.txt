@@ -28,8 +28,8 @@ message("TORCH_LIBRARIES: ${TORCH_LIBRARIES}")
 
 include_directories(${Python3_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
 
-# Define test_mha_fwd executable BEFORE linking
-add_executable(test_mha_fwd test/test_mha_fwd.cpp)
+# Define test_mha_fwd_bwd executable BEFORE linking
+add_executable(test_mha_fwd_bwd test/test_mha_fwd_bwd.cpp)
 
 # Define test_run_mha_fwd executable BEFORE linking
 add_executable(test_run_mha_fwd test/test_run_mha_fwd.cpp)
@@ -43,7 +43,7 @@ get_filename_component(FLASH_ATTN_SO ${FLASH_ATTN_LIB} NAME)
 message("FLASH_ATTN_SO: ${FLASH_ATTN_SO}")
 
 # Link directories
-target_include_directories(test_mha_fwd
+target_include_directories(test_mha_fwd_bwd
     PUBLIC "3rd_party/flash-attn/"
     PUBLIC ${Python3_INCLUDE_DIRS}
     PUBLIC ${TORCH_INCLUDE_DIRS}
@@ -61,7 +61,7 @@ target_include_directories(test_run_mha_bwd
     PUBLIC ${TORCH_INCLUDE_DIRS}
 )
 
-target_link_directories(test_mha_fwd
+target_link_directories(test_mha_fwd_bwd
     PUBLIC ${Python_SITELIB}/torch/lib
     PUBLIC ${Python_SITELIB}
 )
@@ -77,7 +77,7 @@ target_link_directories(test_run_mha_bwd
 )
 
 # Link the required libraries for both executables
-foreach(TEST_EXECUTABLE test_mha_fwd test_run_mha_fwd test_run_mha_bwd)
+foreach(TEST_EXECUTABLE test_mha_fwd_bwd test_run_mha_fwd test_run_mha_bwd)
     target_link_libraries(${TEST_EXECUTABLE} PRIVATE
         ${TORCH_LIBRARIES}  # Link against PyTorch
         ${Python3_LIBRARIES}  # Link against Python

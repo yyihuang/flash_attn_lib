@@ -63,22 +63,22 @@ We recommend to put the your_src-compatible (that is, Flexllm-compatible code) i
 ## Build Locally and Link
 You can reuse the docker from last section for this test. The working directory is `test_cpp_if`, where we have `libs` to build source code from flash-attn and `tests` to run tests of flash-attn funtions. We also have some files under `3rd_party/flexflow-flash-attention` (refer to the readme under this directory).
 
-**To limit the number of template instantiation** (fp16 && hdim=32) to achieve fast compilation, we should:
+**To limit the number of template instantiation** (fp16 && hdim=128) to achieve fast compilation, we should:
 
 * Sepecify the .cu files in Cmake files 
 
 Example: in `test_cpp_if/libs/CMakeLists.txt`, we have
 ```
 set(CUDA_SOURCES
-    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim32_fp16_sm80.cu
-    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim32_fp16_sm80.cu
-    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim32_fp16_sm80.cu
-    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim32_fp16_causal_sm80.cu
-    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim32_fp16_causal_sm80.cu
-    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim32_fp16_causal_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim128_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim128_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim128_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim128_fp16_causal_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim128_fp16_causal_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim128_fp16_causal_sm80.cu
 )
 ```
-to compile attention only with hdim=32 and datatype=fp16.
+to compile attention only with hdim=128 and datatype=fp16.
 
 * Follow the instruction in `3rd_party/flexflow-flash-attention/readme.md`. 
 
@@ -97,11 +97,11 @@ FP16 templates get instantiated.
 ```
 #define HEADDIM_SWITCH(HEADDIM, ...)   \
   [&] {                                \
-    constexpr static int kHeadDim = 32; \
+    constexpr static int kHeadDim = 128; \
     return __VA_ARGS__();              \
   }()
 ```
-Only hdim=32 templates get instantiated.
+Only hdim=128 templates get instantiated.
 
 Put interface declarations in `3rd_party/flexflow-flash-attention/flexflow_flash_api.h`. We put `mha_fwd` and `mha_bwd` for this demo.
 
