@@ -8,18 +8,18 @@ using namespace flash;
 
 int main()
 {
-    int batch_size = 2, seqlen_q = 16, seqlen_k = 16;
-    int num_heads = 8, head_size = 32; // hdim=32
+    int batch_size = 2, seqlen_q = 128, seqlen_k = 128;
+    int num_heads = 8, head_size = 128; // hdim, why only 32 works??
 
     // Ensure FP16 (half precision)
     at::Tensor q = torch::randn({batch_size, seqlen_q, num_heads, head_size},
-                                torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCUDA).requires_grad(true));
+                                torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCUDA));
 
     at::Tensor k = torch::randn({batch_size, seqlen_k, num_heads, head_size},
-                                torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCUDA).requires_grad(true));
+                                torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCUDA));
 
     at::Tensor v = torch::randn({batch_size, seqlen_k, num_heads, head_size},
-                                torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCUDA).requires_grad(true));
+                                torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCUDA));
 
     std::optional<at::Tensor> out_;
     std::optional<at::Tensor> alibi_slopes_;
@@ -29,14 +29,14 @@ int main()
     bool is_causal = false;
     int window_size_left = -1, window_size_right = -1;
     float softcap = 0.0;
-    bool return_softmax = true; // Do not return softmax LSE
+    bool return_softmax = true; // return for bwd
     std::optional<at::Generator> gen_;
 
     // Forward pass
     std::vector<at::Tensor> output;
     try
     {
-        output = flash::mha_fwd(q, k, v, out_, alibi_slopes_,
+        output = mha_fwd(q, k, v, out_, alibi_slopes_,
                                 p_dropout, softmax_scale, is_causal,
                                 window_size_left, window_size_right,
                                 softcap, return_softmax, gen_);
@@ -86,7 +86,7 @@ int main()
     std::vector<at::Tensor> grad_output;
     try
     {
-        grad_output = flash::mha_bwd(dout, q, k, v, out, softmax_lse,
+        grad_output = mha_bwd(dout, q, k, v, out, softmax_lse,
                                      dq_, dk_, dv_, alibi_slopes_,
                                      p_dropout, softmax_scale, is_causal,
                                      window_size_left, window_size_right,

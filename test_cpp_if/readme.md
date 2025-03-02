@@ -31,10 +31,11 @@ mkdir build && cd build
 cmake .. \
   -GNinja \
   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-  -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
+  -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache \
+  -DCMAKE_BUILD_TYPE=Debug 
 // or
 cmake ..
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 
 make -j
 ```

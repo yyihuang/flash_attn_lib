@@ -8,6 +8,21 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# enable TORCH_USE_CUDA_DSA???
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # Enable device-side assertions for PyTorch/CUDA debugging
+    add_compile_definitions(TORCH_USE_CUDA_DSA=1)
+    
+    # Debug flags for CUDA and C++
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -g -lineinfo -lineinfo")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -rdynamic")
+    
+    # Force synchronous CUDA execution for better error reporting
+    list(APPEND ENV{CUDA_LAUNCH_BLOCKING} "1")
+endif()
+
+
 # --------------------------------------------------------
 # 1. Detect GPU + NVCC to set 'compute_capability'
 #    (Based on your snippet, but done at the top-level so

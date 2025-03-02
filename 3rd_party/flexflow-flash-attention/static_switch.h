@@ -102,10 +102,21 @@
 
 // head_dim switch
 // TODO: REMOVE unused type
+// #define HEADDIM_SWITCH(HEADDIM, ...)   \
+//   [&] {                                \
+//     constexpr static int kHeadDim = 32; \
+//     return __VA_ARGS__();              \
+//   }()
+
 #define HEADDIM_SWITCH(HEADDIM, ...)   \
-  [&] {                                \
-    constexpr static int kHeadDim = 32; \
-    return __VA_ARGS__();              \
+  [&] {                                    \
+    if (HEADDIM == 32) {                   \
+      constexpr static int kHeadDim = 32;  \
+      return __VA_ARGS__();                \
+    } else if (HEADDIM == 128) {           \
+      constexpr static int kHeadDim = 128; \
+      return __VA_ARGS__();                \
+    }                                    \
   }()
 
 // original dispatch flow

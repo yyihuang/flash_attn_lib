@@ -24,6 +24,13 @@ find_package(CUDA REQUIRED)
 # (we only compile the needed .cu files)
 # ------------------------------------------------------------
 set(CUDA_SOURCES
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim128_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim128_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim128_fp16_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim128_fp16_causal_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim128_fp16_causal_sm80.cu
+    ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim128_fp16_causal_sm80.cu
+
     ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_hdim32_fp16_sm80.cu
     ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_fwd_split_hdim32_fp16_sm80.cu
     ${CMAKE_SOURCE_DIR}/../3rd_party/flash-attention/csrc/flash_attn/src/flash_bwd_hdim32_fp16_sm80.cu
