@@ -46,7 +46,7 @@ int main()
         int seqlen_k = 16;
         int num_heads = 8;
         int num_heads_k = 8; // Same as num_heads for standard MHA
-        int head_size = 64;
+        int head_size = 128;
 
         // Ensure head_size is a multiple of 8
         if (head_size % 8 != 0)

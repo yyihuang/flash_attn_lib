@@ -9,7 +9,7 @@
 int main()
 {
     int batch_size = 2, seqlen_q = 16, seqlen_k = 16;
-    int num_heads = 8, head_size = 128; // hdim=32
+    int num_heads = 8, head_size = 128; // hdim
 
     // Ensure FP16 (half precision)
     at::Tensor q = torch::randn({batch_size, seqlen_q, num_heads, head_size},
