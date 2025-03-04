@@ -121,6 +121,8 @@ void print_tensor_values(const at::Tensor &tensor, const std::string &name, int 
 // copy or ownership tranfer: use tensor = tensor.clone();
 int main()
 {
+    torch::manual_seed(42);
+    
     try
     {
         std::cout << "CUDA available: " << torch::cuda::is_available() << std::endl;

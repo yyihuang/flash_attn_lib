@@ -15,6 +15,9 @@ int main()
     int batch_size = 2, seqlen_q = 16, seqlen_k = 16;
     int num_heads = 8, head_size = 128; // hdim
 
+    // set a random seed to reproduce
+    torch::manual_seed(42);
+
     // Ensure FP16 (half precision)
     at::Tensor q = torch::randn({batch_size, seqlen_q, num_heads, head_size},
                                 torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCUDA).requires_grad(true));
@@ -45,7 +48,7 @@ int main()
                                 window_size_left, window_size_right,
                                 softcap, return_softmax, gen_);
 
-        torch::cuda::synchronize();
+        // torch::cuda::synchronize();
     }
     catch (const std::exception &e)
     {
@@ -96,7 +99,7 @@ int main()
                                      window_size_left, window_size_right,
                                      softcap, deterministic, gen_, rng_state);
 
-        torch::cuda::synchronize();
+        // torch::cuda::synchronize();
     }
     catch (const std::exception &e)
     {
