@@ -36,19 +36,19 @@ mha_fwd(at::Tensor &q,                            // batch_size x seqlen_q x num
         const float softcap,
         const bool return_softmax,
         std::optional<at::Generator> gen_);
-        
+
 std::vector<at::Tensor>
-mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x multiple_of(head_size_og, 8)
-        const at::Tensor &q,   // batch_size x seqlen_q x num_heads x head_size
-        const at::Tensor &k,   // batch_size x seqlen_k x num_heads_k x head_size
-        const at::Tensor &v,   // batch_size x seqlen_k x num_heads_k x head_size
-        const at::Tensor &out,   // batch_size x seqlen_q x num_heads x head_size
-        const at::Tensor &softmax_lse,     // b x h x seqlen_q
-        std::optional<at::Tensor> &dq_,   // batch_size x seqlen_q x num_heads x head_size
-        std::optional<at::Tensor> &dk_,   // batch_size x seqlen_k x num_heads_k x head_size
-        std::optional<at::Tensor> &dv_,   // batch_size x seqlen_k x num_heads_k x head_size
+mha_bwd(const at::Tensor &dout,                   // batch_size x seqlen_q x num_heads, x multiple_of(head_size_og, 8)
+        const at::Tensor &q,                      // batch_size x seqlen_q x num_heads x head_size
+        const at::Tensor &k,                      // batch_size x seqlen_k x num_heads_k x head_size
+        const at::Tensor &v,                      // batch_size x seqlen_k x num_heads_k x head_size
+        const at::Tensor &out,                    // batch_size x seqlen_q x num_heads x head_size
+        const at::Tensor &softmax_lse,            // b x h x seqlen_q
+        std::optional<at::Tensor> &dq_,           // batch_size x seqlen_q x num_heads x head_size
+        std::optional<at::Tensor> &dk_,           // batch_size x seqlen_k x num_heads_k x head_size
+        std::optional<at::Tensor> &dv_,           // batch_size x seqlen_k x num_heads_k x head_size
         std::optional<at::Tensor> &alibi_slopes_, // num_heads or batch_size x num_heads
-        const float p_dropout,         // probability to drop
+        const float p_dropout,                    // probability to drop
         const float softmax_scale,
         const bool is_causal,
         int window_size_left,
@@ -367,11 +367,51 @@ void set_params_dgrad(Flash_bwd_params &params,
                       bool deterministic,
                       const bool unpadded_lse);
 
-
 // some other helpers
 void set_params_alibi(Flash_fwd_params &params, std::optional<at::Tensor> &alibi_slopes_, int batch_size, int num_heads);
 
 std::tuple<at::Tensor, at::Tensor> set_params_splitkv(Flash_fwd_params &params, const int batch_size,
-    const int num_heads, const int head_size, const int max_seqlen_k, const int max_seqlen_q,
-    const int head_size_rounded, const float p_dropout,
-    const int num_splits, const int num_sm, struct c10::TensorOptions opts);
+                                                      const int num_heads, const int head_size, const int max_seqlen_k, const int max_seqlen_q,
+                                                      const int head_size_rounded, const float p_dropout,
+                                                      const int num_splits, const int num_sm, struct c10::TensorOptions opts);
+
+// some other helpers
+#define CHECK_CUDA_ERRORS()                                                                                                           \
+        {                                                                                                                             \
+                cudaError_t err = cudaGetLastError();                                                                                 \
+                if (err != cudaSuccess)                                                                                               \
+                {                                                                                                                     \
+                        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+                        exit(EXIT_FAILURE);                                                                                           \
+                }                                                                                                                     \
+        }
+
+#define CHECK_CUDA(call)                                                                \
+        do                                                                              \
+        {                                                                               \
+                cudaError_t status_ = call;                                             \
+                if (status_ != cudaSuccess)                                             \
+                {                                                                       \
+                        fprintf(stderr, "CUDA error (%s:%d): %s\n", __FILE__, __LINE__, \
+                                cudaGetErrorString(status_));                           \
+                        exit(1);                                                        \
+                }                                                                       \
+        } while (0)
+
+#define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
+#define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
+#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+
+inline int get_current_device()
+{
+        int device;
+        CHECK_CUDA(cudaGetDevice(&device));
+        return device;
+}
+
+inline int get_num_sm(int device)
+{
+        int multiprocessor_count;
+        CHECK_CUDA(cudaDeviceGetAttribute(&multiprocessor_count, cudaDevAttrMultiProcessorCount, device));
+        return multiprocessor_count;
+}
