@@ -2,4 +2,11 @@ commands.txt
 test_cpp_if/build/*
 .vscode
 build
-
+*.whl
+*.so    
+*.dylib
+*.lib
+*.a
+*.dll
+*.exp
+*.def
