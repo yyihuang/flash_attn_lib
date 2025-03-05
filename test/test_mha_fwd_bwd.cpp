@@ -33,7 +33,7 @@ int main()
 
     float p_dropout = 0.1;
     float softmax_scale = 1.0 / sqrt(head_size);
-    bool is_causal = false;
+    bool is_causal = true;
     int window_size_left = -1, window_size_right = -1;
     float softcap = 0.0;
     bool return_softmax = true; // Do not return softmax LSE

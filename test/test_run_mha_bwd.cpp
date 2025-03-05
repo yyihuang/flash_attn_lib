@@ -8,46 +8,6 @@
 #include <iostream>
 #include "flash_api.h"
 
-#define CHECK_CUDA_ERRORS()                                                                                               \
-    {                                                                                                                     \
-        cudaError_t err = cudaGetLastError();                                                                             \
-        if (err != cudaSuccess)                                                                                           \
-        {                                                                                                                 \
-            std::cerr << "CUDA Error: " << cudaGetErrorString(err) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-            exit(EXIT_FAILURE);                                                                                           \
-        }                                                                                                                 \
-    }
-
-#define CHECK_CUDA(call)                                                    \
-    do                                                                      \
-    {                                                                       \
-        cudaError_t status_ = call;                                         \
-        if (status_ != cudaSuccess)                                         \
-        {                                                                   \
-            fprintf(stderr, "CUDA error (%s:%d): %s\n", __FILE__, __LINE__, \
-                    cudaGetErrorString(status_));                           \
-            exit(1);                                                        \
-        }                                                                   \
-    } while (0)
-
-#define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
-#define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
-#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
-
-inline int get_current_device()
-{
-    int device;
-    CHECK_CUDA(cudaGetDevice(&device));
-    return device;
-}
-
-inline int get_num_sm(int device)
-{
-    int multiprocessor_count;
-    CHECK_CUDA(cudaDeviceGetAttribute(&multiprocessor_count, cudaDevAttrMultiProcessorCount, device));
-    return multiprocessor_count;
-}
-
 // why this could not be linked????
 std::tuple<at::Tensor, at::Tensor> set_params_splitkv(Flash_fwd_params &params, const int batch_size,
                                                       const int num_heads, const int head_size, const int max_seqlen_k, const int max_seqlen_q,
@@ -85,34 +45,6 @@ std::tuple<at::Tensor, at::Tensor> set_params_splitkv(Flash_fwd_params &params, 
     return std::make_tuple(softmax_lse_accum, out_accum);
 }
 
-void print_tensor_values(const at::Tensor &tensor, const std::string &name, int num_elements = 5)
-{
-    at::Tensor tensor_cpu = tensor.to(torch::kCPU, torch::kFloat); // Convert to float32 for printing
-    std::cout << name << " (first " << num_elements << " values): ";
-
-    if (tensor.dim() == 4)
-    { // Standard Q, K, V, Output tensors
-        auto accessor = tensor_cpu.accessor<float, 4>();
-        for (int i = 0; i < num_elements && i < tensor_cpu.numel(); ++i)
-        {
-            std::cout << std::fixed << std::setprecision(5) << accessor[0][0][0][i] << " ";
-        }
-    }
-    else if (tensor.dim() == 3)
-    { // Softmax LSE (batch_size, num_heads, seqlen_q)
-        auto accessor = tensor_cpu.accessor<float, 3>();
-        for (int i = 0; i < num_elements && i < tensor_cpu.numel(); ++i)
-        {
-            std::cout << std::fixed << std::setprecision(5) << accessor[0][0][i] << " ";
-        }
-    }
-    else
-    {
-        std::cerr << "Unsupported tensor dimension: " << tensor.dim() << std::endl;
-    }
-
-    std::cout << std::endl;
-}
 
 // To pass raw data pointer (on-device) to at::Tensor interface without copying
 // Refer this: torch::from_blob
@@ -130,8 +62,8 @@ int main()
 
         int batch_size = 2, seqlen_q = 128, seqlen_k = 128;
         int num_heads = 8, num_heads_k = 8, head_size = 128;
-        float p_dropout = 0.1f, softmax_scale = 1.0f, softcap = 0.0f;
-        bool return_softmax = true, is_causal = true;
+        float p_dropout = 0.1f, softmax_scale = 1.0 / sqrt(head_size), softcap = 0.0f;
+        bool return_softmax = true, is_causal = false;
         int window_size_left = -1, window_size_right = -1;
         std::optional<at::Tensor> alibi_slopes_ = std::nullopt;
         std::optional<at::Tensor> out_ = std::nullopt;
@@ -292,10 +224,10 @@ int main()
         }
 
         std::cout << "Output Tensor Shape: " << out.sizes() << std::endl;
-        std::cout << "Softmax LSE Shape: " << softmax_lse.sizes() << std::endl;
+        std::cout << "out: " << out << std::endl;
 
-        print_tensor_values(out, "Output Tensor (after Forward)");
-        print_tensor_values(softmax_lse, "Softmax LSE");
+        std::cout << "Softmax LSE Shape: " << softmax_lse.sizes() << std::endl;
+        std::cout << "softmax_lse: " << softmax_lse << std::endl;   
 
         // ========================================================================================================
         // Backward Pass: Create dout, ensuring alignment with PyTorch behavior
@@ -457,15 +389,14 @@ int main()
         //     dv = dv.index({"...", torch::indexing::Slice(0, head_size)});
         // }
 
-        // Print the size of dq, dk, dv
+        // Print the size of dq, dk, dv and their values
         std::cout << "dq Tensor Shape: " << dq.sizes() << std::endl;
+        std::cout << "dq: " << dq << std::endl;
         std::cout << "dk Tensor Shape: " << dk.sizes() << std::endl;
+        std::cout << "dk: " << dk << std::endl;
         std::cout << "dv Tensor Shape: " << dv.sizes() << std::endl;
+        std::cout << "dv: " << dv << std::endl;
 
-        // Print output gradients
-        print_tensor_values(dq, "dQ (Gradient of Q)");
-        print_tensor_values(dk, "dK (Gradient of K)");
-        print_tensor_values(dv, "dV (Gradient of V)");
     }
     catch (const c10::Error &e)
     {
