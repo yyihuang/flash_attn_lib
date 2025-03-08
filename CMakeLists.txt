@@ -62,18 +62,15 @@ target_include_directories(test_run_mha_bwd
 )
 
 target_link_directories(test_mha_fwd_bwd
-    PUBLIC ${Python_SITELIB}/torch/lib
-    PUBLIC ${Python_SITELIB}
+    PRIVATE ${Python_SITELIB}
 )
 
 target_link_directories(test_run_mha_fwd
-    PUBLIC ${Python_SITELIB}/torch/lib
-    PUBLIC ${Python_SITELIB}
+    PRIVATE ${Python_SITELIB}
 )
 
 target_link_directories(test_run_mha_bwd
-    PUBLIC ${Python_SITELIB}/torch/lib
-    PUBLIC ${Python_SITELIB}
+    PRIVATE ${Python_SITELIB}
 )
 
 # Link the required libraries for both executables
