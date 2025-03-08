@@ -10,23 +10,28 @@ add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 add_compile_definitions(TORCH_USE_CUDA_DSA=1)
 
 # Find Python
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
 # Find Python & Torch
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 # Include Torch
-execute_process(
-    COMMAND ${Python_EXECUTABLE} -c "import torch; print(torch.utils.cmake_prefix_path)"
-    OUTPUT_VARIABLE Torch_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+# execute_process(
+#     COMMAND ${Python_EXECUTABLE} -c "import torch; print(torch.utils.cmake_prefix_path)"
+#     OUTPUT_VARIABLE Torch_DIR
+#     OUTPUT_STRIP_TRAILING_WHITESPACE
+# )
 find_package(Torch REQUIRED PATHS ${Torch_DIR})
 message("Torch_DIR: ${Torch_DIR}")
 message("TORCH_INCLUDE_DIRS: ${TORCH_INCLUDE_DIRS}")
 message("TORCH_LIBRARIES: ${TORCH_LIBRARIES}")
 
-include_directories(${Python3_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
+
+# include_directories(${Python3_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
+set(FLASH_ATTN_TEST_DIRS "")
+list(APPEND FLASH_ATTN_TEST_DIRS "3rd_party/flash-attn/")
+list(APPEND FLASH_ATTN_TEST_DIRS ${Python3_INCLUDE_DIRS})
+list(APPEND FLASH_ATTN_TEST_DIRS ${TORCH_INCLUDE_DIRS})
+message("FLASH_ATTN_TEST_DIRS: ${FLASH_ATTN_TEST_DIRS}")
 
 # Define test_mha_fwd_bwd executable BEFORE linking
 add_executable(test_mha_fwd_bwd test/test_mha_fwd_bwd.cpp)
@@ -43,22 +48,17 @@ get_filename_component(FLASH_ATTN_SO ${FLASH_ATTN_LIB} NAME)
 message("FLASH_ATTN_SO: ${FLASH_ATTN_SO}")
 
 # Link directories
+
 target_include_directories(test_mha_fwd_bwd
-    PUBLIC "3rd_party/flash-attn/"
-    PUBLIC ${Python3_INCLUDE_DIRS}
-    PUBLIC ${TORCH_INCLUDE_DIRS}
+    PUBLIC ${FLASH_ATTN_TEST_DIRS}
 )
 
 target_include_directories(test_run_mha_fwd
-    PUBLIC "3rd_party/flash-attn/"
-    PUBLIC ${Python3_INCLUDE_DIRS}
-    PUBLIC ${TORCH_INCLUDE_DIRS}
+    PUBLIC ${FLASH_ATTN_TEST_DIRS}
 )
 
 target_include_directories(test_run_mha_bwd
-    PUBLIC "3rd_party/flash-attn/"
-    PUBLIC ${Python3_INCLUDE_DIRS}
-    PUBLIC ${TORCH_INCLUDE_DIRS}
+    PUBLIC ${FLASH_ATTN_TEST_DIRS}
 )
 
 target_link_directories(test_mha_fwd_bwd
