@@ -61,11 +61,13 @@ int main()
         std::cout << "CUDNN available: " << torch::cuda::cudnn_is_available() << std::endl;
 
         int batch_size = 2, seqlen_q = 128, seqlen_k = 128;
-        int num_heads = 8, num_heads_k = 8, head_size = 128;
+        int num_heads = 16, num_heads_k = 8, head_size = 128;
         float p_dropout = 0.1f, softmax_scale = 1.0 / sqrt(head_size), softcap = 0.0f;
-        bool return_softmax = true, is_causal = false;
+        bool return_softmax = false, is_causal = true;
         int window_size_left = -1, window_size_right = -1;
-        std::optional<at::Tensor> alibi_slopes_ = std::nullopt;
+        // add alibi slopes. ALiBi slopes must have dtype fp32
+        at::Tensor alibi_slopes = at::randn({batch_size, num_heads}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        std::optional<at::Tensor> alibi_slopes_ = alibi_slopes;
         std::optional<at::Tensor> out_ = std::nullopt;
         std::optional<at::Generator> gen_ = std::nullopt;
 
