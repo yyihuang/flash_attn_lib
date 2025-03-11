@@ -21,3 +21,9 @@ find /opt/conda -name "flash_attn*.so"
 # Set LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/opt/conda/lib/python3.11/site-packages/torch/lib:$LD_LIBRARY_PATH
 
+# command to test
+cd workspace/flash_attention_lib/build/
+rm -rf * && cmake .. && make -j && ./test_run_mha_bwd
+
+# attention:
+Using version >= 2.7.4.post1, the tested functions will be under flash namespace.

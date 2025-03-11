@@ -111,8 +111,8 @@ int main()
         }
 
         // FlashAttention forward parameters
-        Flash_fwd_params params;
-        set_params_fprop(params,
+        flash::Flash_fwd_params params;
+        flash::set_params_fprop(params,
                          batch_size,
                          seqlen_q, seqlen_k,
                          seqlen_q, seqlen_k, // Rounded lengths (not rounded in this test)
@@ -130,12 +130,12 @@ int main()
                          1.0                         // softcap
         );
 
-        // Get CUDA stream
+        // Get CUDA stream 
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         // Run the MHA forward function
         std::cout << "Running FlashAttention..." << std::endl;
-        run_mha_fwd(params, stream);
+        flash::run_mha_fwd(params, stream);
 
         // Synchronize to ensure computation is complete
         torch::cuda::synchronize();

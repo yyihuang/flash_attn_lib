@@ -136,9 +136,26 @@ RUN echo "CUDA_HOME=${CUDA_HOME}" >> ~/.bashrc && \
 # Install flash-attn
 # RUN pip install --no-build-isolation flash-attn --no-cache-dir
 
-RUN wget -O /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp311-cp311-linux_x86_64.whl \
-    https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.0.post2/flash_attn-2.7.0.post2+cu12torch2.4cxx11abiFALSE-cp311-cp311-linux_x86_64.whl && \
-    pip install /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp311-cp311-linux_x86_64.whl --no-build-isolation && \
+# Install flash-attn of correct cuda version, torch version, and python version and right abi
+RUN wget -O /tmp/flash_attn-2.7.4.post1+cu12torch2.5cxx11abiFALSE-cp311-cp311-linux_x86_64.whl \
+    https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.5cxx11abiFALSE-cp311-cp311-linux_x86_64.whl && \
+    pip install /tmp/flash_attn-2.7.4.post1+cu12torch2.5cxx11abiFALSE-cp311-cp311-linux_x86_64.whl --no-build-isolation && \
     rm -rf /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp311-cp311-linux_x86_64.whl
+
+# # Install FlashAttention of the correct CUDA, Torch, and Python version dynamically
+# RUN python -c "import torch; print(f'PyTorch Version: {torch.__version__}')" && \
+#     python -c "import sys; print(f'Python Version: {sys.version_info.major}.{sys.version_info.minor}')" && \
+#     python -c "import torch; print(f'CXX11 ABI: {torch._C._GLIBCXX_USE_CXX11_ABI}')" && \
+#     export PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')") && \
+#     export PYTORCH_VERSION=$(python -c "import torch; print('.'.join(torch.__version__.split('.')[:2]))") && \
+#     export TORCH_VERSION_STRIPPED=$(python -c "import torch; print('.'.join(torch.__version__.replace('+cu', '').split('.')[:2]))") && \
+#     export CXX_ABI=$(python -c "import torch; print('TRUE' if torch._C._GLIBCXX_USE_CXX11_ABI else 'FALSE')") && \
+#     export CUDA_MAJOR_MINOR=$(echo "${cuda_version}" | cut -d'.' -f1,2 | tr -d '.') && \
+#     export FLASH_ATTN_WHL="flash_attn-2.7.0.post2+cu${CUDA_MAJOR_MINOR}torch${TORCH_VERSION_STRIPPED}cxx11abi${CXX_ABI}-${PYTHON_VERSION}-${PYTHON_VERSION}-linux_x86_64.whl" && \
+#     export FLASH_ATTN_URL="https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.0.post2/${FLASH_ATTN_WHL}" && \
+#     echo "Downloading FlashAttention from: ${FLASH_ATTN_URL}" && \
+#     curl -fsSL -o /tmp/${FLASH_ATTN_WHL} --write-out "%{http_code}" ${FLASH_ATTN_URL} | tee /dev/stderr | grep -q "200" && \
+#     pip install /tmp/${FLASH_ATTN_WHL} --no-build-isolation && \
+#     rm -rf /tmp/${FLASH_ATTN_WHL}
 
 ENTRYPOINT ["/bin/bash"]

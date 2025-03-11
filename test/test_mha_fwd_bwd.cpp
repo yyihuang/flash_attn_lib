@@ -43,7 +43,7 @@ int main()
     std::vector<at::Tensor> output;
     try
     {
-        output = mha_fwd(q, k, v, out_, alibi_slopes_,
+        output = flash::mha_fwd(q, k, v, out_, alibi_slopes_,
                                 p_dropout, softmax_scale, is_causal,
                                 window_size_left, window_size_right,
                                 softcap, return_softmax, gen_);
@@ -93,7 +93,7 @@ int main()
     std::vector<at::Tensor> grad_output;
     try
     {
-        grad_output = mha_bwd(dout, q, k, v, out, softmax_lse,
+        grad_output = flash::mha_bwd(dout, q, k, v, out, softmax_lse,
                                      dq_, dk_, dv_, alibi_slopes_,
                                      p_dropout, softmax_scale, is_causal,
                                      window_size_left, window_size_right,
