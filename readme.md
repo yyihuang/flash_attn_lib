@@ -45,7 +45,14 @@ export LD_LIBRARY_PATH=/usr/local/miniconda/envs/py310/lib/python3.10/site-packa
 export LD_LIBRARY_PATH=/usr/local/miniconda/envs/py310/lib/python3.10/site-packages:$LD_LIBRARY_PATH
 ./test_mha_fwd_bwd
 ```
+Find the flash-attn localtion:
+```
+find /usr/local/miniconda/envs/py310 -name "flash_attn*.so"
+# /usr/local/miniconda/envs/py310/lib/python3.10/site-packages/flash_attn_2_cuda.cpython-310-x86_64-linux-gnu.so
 
+find /usr/local -name "flash_attn*.so"
+# /usr/local/lib/python3.10/site-packages/flash_attn_2_cuda.cpython-310-x86_64-linux-gnu.so
+```
 Referenced Practice:  https://github.com/zhihu/ZhiLight/tree/main/3rd/flash_decoding
 
 Here is the file structure.
