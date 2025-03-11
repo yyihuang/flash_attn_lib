@@ -7,61 +7,52 @@ LABEL org.opencontainers.image.description="flexflow-serve environment container
 SHELL ["/bin/bash", "-c"]
 
 # Install basic dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends wget sudo binutils git zlib1g-dev lsb-release nano gdb libhdf5-dev jq openssh-client && \
-    rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/cuda.list /etc/apt/sources.list.d/nvidia-ml.list && \
-	apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends software-properties-common && \
-    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential apt-utils \
-    ca-certificates libssl-dev curl unzip htop ninja-build && DEBIAN_FRONTEND=noninteractive \
-        apt-get install -y software-properties-common && \
-        add-apt-repository ppa:ubuntu-toolchain-r/test && \
-        apt-get update -y && \
-        apt-get upgrade -y libstdc++6
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget sudo binutils git zlib1g-dev lsb-release nano gdb libhdf5-dev jq openssh-client \
+    software-properties-common build-essential apt-utils ca-certificates libssl-dev curl unzip htop ninja-build && \
+    add-apt-repository ppa:ubuntu-toolchain-r/test && \
+    apt-get update -y && \
+    apt-get upgrade -y libstdc++6 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Python3 with Miniconda
-ARG python_version "latest"
+ARG python_version="latest"
 RUN rm -rf /opt/conda && \
-    MINICONDA_SCRIPT_NAME=Miniconda3-latest-Linux-x86_64.sh; \
-    if [ "$python_version" != "3.8" ] && [ "$python_version" != "3.9" ] && [ "$python_version" != "3.10" ] && [ "$python_version" != "3.11" ] && [ "$python_version" != "3.12" ] && [ "$python_version" != "latest" ]; then \
-        echo "python_version '${python_version}' is not supported, please choose among {3.8, 3.9, 3.10, 3.11, 3.12 or latest (default)}"; \
-        exit 1; \
-    fi; \
+    MINICONDA_SCRIPT_NAME="Miniconda3-latest-Linux-x86_64.sh"; \
     if [ "${python_version}" = "3.8" ]; then \
-        MINICONDA_SCRIPT_NAME=Miniconda3-py38_23.5.2-0-Linux-x86_64.sh; \
+        MINICONDA_SCRIPT_NAME="Miniconda3-py38_23.5.2-0-Linux-x86_64.sh"; \
     elif [ "${python_version}" = "3.9" ]; then \
-        MINICONDA_SCRIPT_NAME=Miniconda3-py39_23.5.2-0-Linux-x86_64.sh; \
+        MINICONDA_SCRIPT_NAME="Miniconda3-py39_23.5.2-0-Linux-x86_64.sh"; \
     elif [ "${python_version}" = "3.10" ]; then \
-        MINICONDA_SCRIPT_NAME=Miniconda3-py310_23.5.2-0-Linux-x86_64.sh; \
+        MINICONDA_SCRIPT_NAME="Miniconda3-py310_23.5.2-0-Linux-x86_64.sh"; \
     elif [ "${python_version}" = "3.11" ]; then \
-        MINICONDA_SCRIPT_NAME=Miniconda3-py311_23.5.2-0-Linux-x86_64.sh; \
+        MINICONDA_SCRIPT_NAME="Miniconda3-py311_23.5.2-0-Linux-x86_64.sh"; \
     elif [ "${python_version}" = "3.12" ]; then \
-        MINICONDA_SCRIPT_NAME=Miniconda3-py312_25.1.1-2-Linux-x86_64.sh; \
-    elif [ "${python_version}" = "latest" ]; then \
-        MINICONDA_SCRIPT_NAME=Miniconda3-latest-Linux-x86_64.sh; \
+        MINICONDA_SCRIPT_NAME="Miniconda3-py312_25.1.1-2-Linux-x86_64.sh"; \
     fi; \
     wget -c -q https://repo.continuum.io/miniconda/${MINICONDA_SCRIPT_NAME} && \
-        mv ./${MINICONDA_SCRIPT_NAME} ~/${MINICONDA_SCRIPT_NAME} && \
-        chmod +x ~/${MINICONDA_SCRIPT_NAME} && \
-        bash ~/${MINICONDA_SCRIPT_NAME} -b -p /opt/conda && \
-        rm ~/${MINICONDA_SCRIPT_NAME} && \
-	/opt/conda/bin/conda config --set solver classic && \
-        /opt/conda/bin/conda upgrade --all && \
-        /opt/conda/bin/conda install conda-build conda-verify && \
-        /opt/conda/bin/conda clean -ya && \
-    ln -sf /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /opt/conda/lib/libstdc++.so.6
+    bash ${MINICONDA_SCRIPT_NAME} -b -p /opt/conda && \
+    rm ${MINICONDA_SCRIPT_NAME} && \
+    /opt/conda/bin/conda config --set solver classic && \
+    /opt/conda/bin/conda upgrade --all && \
+    /opt/conda/bin/conda install conda-build conda-verify && \
+    /opt/conda/bin/conda clean -ya
 
-# set MAKEFLAGS to speedup any dependency that uses make
+# Set environment variables
+ENV PATH="/opt/conda/bin:${PATH}"
+ENV CUDNN_DIR="/usr/local/cuda"
+ENV CUDA_DIR="/usr/local/cuda"
+ENV CUDA_HOME="/usr/local/cuda"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+
+# Set up parallel build flags
 ARG N_BUILD_CORES
-ENV MAKEFLAGS "${MAKEFLAGS} -j${N_BUILD_CORES}"
-
-# Set env vars
-ENV PATH /opt/conda/bin:$PATH
-ENV CUDNN_DIR /usr/local/cuda
-ENV CUDA_DIR /usr/local/cuda
+ENV MAKEFLAGS="-j${N_BUILD_CORES}"
 
 # GPU-specific dependencies
-ARG FF_GPU_BACKEND "cuda"
-ARG cuda_version ""
-ARG hip_version "5.6"
+ARG FF_GPU_BACKEND="cuda"
+ARG cuda_version="12.1"
+ARG hip_version="5.6"
 
 # Install hip dependencies if FF_GPU_BACKEND is hip_cuda or hip_rocm
 # Note that amd's docs say to also install the `hip-runtime-nvidia` package. This
@@ -97,45 +88,46 @@ RUN  if [ "$FF_GPU_BACKEND" = "hip_cuda" ] || [ "$FF_GPU_BACKEND" = "hip_rocm" ]
     fi
 RUN rm -rf /var/lib/apt/lists/*
 
-# Install python packages and other dependencies
+# Install Python packages
 RUN conda install -c conda-forge cmake make cmake-build-extension numpy pandas
-# Install Pytorch
+
+# Install PyTorch (CUDA Version)
+ARG cuda_version="12.1"
 COPY install_pytorch.sh /usr/local/bin/install_pytorch.sh
+# RUN chmod +x /usr/local/bin/install_pytorch.sh && \
+#     /usr/local/bin/install_pytorch.sh ${cuda_version} ${python_version} && \
+#     rm /usr/local/bin/install_pytorch.sh
+
 RUN if [ "$FF_GPU_BACKEND" == "cuda" ] ; then \
         echo "FF_GPU_BACKEND: ${FF_GPU_BACKEND}. Installing PyTorch with CUDA"; \
         chmod +x /usr/local/bin/install_pytorch.sh && \
-        /usr/local/bin/install_pytorch.sh ${cuda_version}; \
+        /usr/local/bin/install_pytorch.sh ${cuda_version} ${python_version}; \
     else \
         echo "FF_GPU_BACKEND: ${FF_GPU_BACKEND}. Installing CPU-only PyTorch"; \
         pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; \
     fi
 RUN rm /usr/local/bin/install_pytorch.sh
-# Various dependencies
+
+# Install other dependencies
 RUN pip3 install transformers>=4.47.1 sentencepiece einops
 RUN pip3 install tensorflow notebook
-# PEFT-related
-RUN pip3 install scipy bitsandbytes datasets accelerate loralib triton peft pytest
-RUN pip3 install streamlit
+RUN pip3 install scipy bitsandbytes datasets accelerate loralib triton peft pytest streamlit
 
 # Install Rust
 RUN rm -rf /root/.cargo /root/.rustup && \
     mkdir -p /root/.cargo /root/.rustup && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable && \
-    rm -rf /root/.rustup/tmp/ && \
-    rm -rf /root/.rustup/toolchains/*/share/zsh && \
-    rm -rf /root/.rustup/toolchains/*/etc/bash_completion.d && \
     chmod -R a+w /root/.rustup /root/.cargo
 
 ENV PATH="/root/.cargo/bin:${PATH}"
-ENV RUSTUP_HOME=/root/.rustup
-ENV CARGO_HOME=/root/.cargo
+ENV RUSTUP_HOME="/root/.rustup"
+ENV CARGO_HOME="/root/.cargo"
 
 # Set up CMake environment variables with torch
 ENV CMAKE_PREFIX_PATH="/opt/conda/lib/python3.10/site-packages/torch"
 
-# Set up CUDA environment variables
-ENV CUDA_HOME /usr/local/cuda
-ENV PATH $CUDA_HOME/bin:$PATH
-ENV LD_LIBRARY_PATH $CUDA_HOME/lib64:$LD_LIBRARY_PATH
+# Ensure CUDA paths are correctly set
+RUN echo "CUDA_HOME=${CUDA_HOME}" >> ~/.bashrc && \
+    echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> ~/.bashrc
 
 ENTRYPOINT ["/bin/bash"]

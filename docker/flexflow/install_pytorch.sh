@@ -1,67 +1,39 @@
 #!/bin/bash
 
-# Check if CUDA version is supplied
+# Check if CUDA and Python versions are supplied
 if [ -z "$1" ]; then
-  echo "Please provide the CUDA version as XX.Y (e.g., 11.8)"
+  echo "Please provide the CUDA version as XX.Y (e.g., 12.1)"
   exit 1
 fi
 
-# Extract major and minor version from input
+if [ -z "$2" ]; then
+  echo "Please provide the Python version (e.g., 3.8, 3.9, 3.10, 3.11, 3.12, or latest)"
+  exit 1
+fi
+
 CUDA_VERSION=$1
-MAJOR_VERSION=$(echo "$CUDA_VERSION" | cut -d '.' -f 1)
-MINOR_VERSION=$(echo "$CUDA_VERSION" | cut -d '.' -f 2)
+PYTHON_VERSION=$2
+CUDA_MAJOR=$(echo "$CUDA_VERSION" | cut -d '.' -f 1)
+CUDA_MINOR=$(echo "$CUDA_VERSION" | cut -d '.' -f 2)
 
-# Function to install PyTorch
-install_pytorch() {
-  local major=$1
-  local minor=$2
+# Activate conda base
+source /opt/conda/bin/activate base
 
-  echo "Attempting to install PyTorch with CUDA ${major}.${minor} support..."
+# Ensure we are using the correct Python version
+if [ "$PYTHON_VERSION" != "latest" ]; then
+  conda install -y python=${PYTHON_VERSION}
+fi
 
-  # Run dry-run first
-  if pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu"${major}${minor}" --dry-run; then
-    echo "Dry-run succeeded, proceeding with actual installation..."
-    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu"${major}${minor}"
-    return 0
-  else
-    echo "Dry-run failed for CUDA ${major}.${minor}."
-    return 1
-  fi
-}
+# Install PyTorch with CUDA support
+echo "Installing PyTorch with CUDA ${CUDA_MAJOR}.${CUDA_MINOR} for Python ${PYTHON_VERSION}..."
+pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu${CUDA_MAJOR}${CUDA_MINOR}
 
-# Try to install with provided CUDA version or lower
-while [ "$MINOR_VERSION" -ge 0 ]; do
-  if install_pytorch "$MAJOR_VERSION" "$MINOR_VERSION"; then
-    echo "PyTorch installation successful with CUDA ${MAJOR_VERSION}.${MINOR_VERSION}"
-    exit 0
-  else
-    # Decrease the minor version
-    MINOR_VERSION=$((MINOR_VERSION - 1))
+# Verify installation
+python3 -c "import torch; print('Torch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available())"
 
-    # Abort if minor version is less than 0 (all <= input failed)
-    if [ "$MINOR_VERSION" -lt 0 ]; then
-      echo "All minor versions <= input failed. Searching for the smallest minor version."
-    fi
-  fi
-done
-
-# Now attempt to find the smallest available minor version >= 0
-MINOR_VERSION=0
-echo "Starting search for the smallest minor version..."
-
-while true; do
-  if install_pytorch "$MAJOR_VERSION" "$MINOR_VERSION"; then
-    echo "PyTorch installation successful with CUDA ${MAJOR_VERSION}.${MINOR_VERSION}"
-    exit 0
-  else
-    # Increase minor version to search for available one
-    MINOR_VERSION=$((MINOR_VERSION + 1))
-
-    # Stop if no valid version is found after a certain number of tries
-    # For practical purposes, let's assume we won't go beyond minor version 10
-    if [ "$MINOR_VERSION" -gt 10 ]; then
-      echo "No valid PyTorch installation found for CUDA ${MAJOR_VERSION}. Aborting."
-      exit 1
-    fi
-  fi
-done
+if [ $? -ne 0 ]; then
+  echo "PyTorch installation failed."
+  exit 1
+else
+  echo "PyTorch successfully installed with CUDA ${CUDA_MAJOR}.${CUDA_MINOR} for Python ${PYTHON_VERSION}."
+fi
