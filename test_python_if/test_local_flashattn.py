@@ -16,8 +16,8 @@ v = torch.randn(batch_size, seqlen_k, num_heads, head_size, device="cuda", dtype
 # Set parameters
 dropout_p = 0.0  # No dropout during inference
 softmax_scale = 1.0 / (head_size ** 0.5)
-causal = False  # No causal masking
-window_size = (-1, -1)  # Full attention
+causal = True  # decoder 
+window_size = (-1, 0)  # Full attention
 
 # Run FlashAttention
 try:
