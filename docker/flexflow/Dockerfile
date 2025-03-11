@@ -123,11 +123,22 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 ENV RUSTUP_HOME="/root/.rustup"
 ENV CARGO_HOME="/root/.cargo"
 
-# Set up CMake environment variables with torch
-ENV CMAKE_PREFIX_PATH="/opt/conda/lib/python3.10/site-packages/torch"
+# Set up CMake environment variables with torch with $python_version
+ENV CMAKE_PREFIX_PATH="/opt/conda/lib/python${python_version}/site-packages/torch"
+
+# Set up the correct LD_LIBRARY_PATH for PyTorch
+ENV LD_LIBRARY_PATH=/opt/conda/lib/python${python_version}/site-packages/torch/lib:$LD_LIBRARY_PATH
 
 # Ensure CUDA paths are correctly set
 RUN echo "CUDA_HOME=${CUDA_HOME}" >> ~/.bashrc && \
     echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> ~/.bashrc
+
+# Install flash-attn
+# RUN pip install --no-build-isolation flash-attn --no-cache-dir
+
+RUN wget -O /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp311-cp311-linux_x86_64.whl \
+    https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.0.post2/flash_attn-2.7.0.post2+cu12torch2.4cxx11abiFALSE-cp311-cp311-linux_x86_64.whl && \
+    pip install /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp311-cp311-linux_x86_64.whl --no-build-isolation && \
+    rm -rf /tmp/flash_attn-2.7.4.post1+cu12torch2.2cxx11abiFALSE-cp311-cp311-linux_x86_64.whl
 
 ENTRYPOINT ["/bin/bash"]
