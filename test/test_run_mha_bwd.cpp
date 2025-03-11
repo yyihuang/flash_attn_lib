@@ -60,7 +60,7 @@ int main()
         std::cout << "CUDA available: " << torch::cuda::is_available() << std::endl;
         std::cout << "CUDNN available: " << torch::cuda::cudnn_is_available() << std::endl;
 
-        int batch_size = 2, seqlen_q = 128, seqlen_k = 128;
+        int batch_size = 2, seqlen_q = 32, seqlen_k = 64;
         int num_heads = 16, num_heads_k = 8, head_size = 128;
         float p_dropout = 0.1f, softmax_scale = 1.0 / sqrt(head_size), softcap = 0.0f;
         bool return_softmax = false, is_causal = true;
@@ -225,6 +225,7 @@ int main()
             softmax_lse = softmax_lse.reshape({batch_size, num_heads_k * seqlen_q, 1});
         }
 
+        // out should have shape (batch_size, seqlen_q, num_heads, head_size)
         std::cout << "Output Tensor Shape: " << out.sizes() << std::endl;
         std::cout << "out: " << out << std::endl;
 

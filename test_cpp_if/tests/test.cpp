@@ -9,7 +9,7 @@ using namespace flash;
 int main()
 {
     int batch_size = 2, seqlen_q = 128, seqlen_k = 128;
-    int num_heads = 8, head_size = 128; // hdim, why only 32 works??
+    int num_heads = 8, head_size = 32; // hdim, why only 32 works??
 
     // Ensure FP16 (half precision)
     at::Tensor q = torch::randn({batch_size, seqlen_q, num_heads, head_size},
