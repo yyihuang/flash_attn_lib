@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 3.18)
 project(flash_attn_2_cuda LANGUAGES CXX CUDA)
 
 # Parallel compilation settings (at top before targets)
-set(CMAKE_JOB_POOLS compile_pool=16 link_pool=4)
-set(CUDA_PARALLEL_COMPILE_JOBS 16)
-set(CUDA_PARALLEL_LINK_JOBS 4)
-set(CUDA_SEPARABLE_COMPILATION ON)
+# set(CMAKE_JOB_POOLS compile_pool=16 link_pool=4)
+# set(CUDA_PARALLEL_COMPILE_JOBS 16)
+# set(CUDA_PARALLEL_LINK_JOBS 4)
+# set(CUDA_SEPARABLE_COMPILATION ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,12 +74,12 @@ target_compile_options(flash_attn_2_cuda PRIVATE
     --expt-extended-lambda
     --use_fast_math
     --ptxas-options=-v
-    --ptxas-options=-O1
-    -maxrregcount=128
+    # --ptxas-options=-O1
+    # -maxrregcount=128
     -Xcompiler=-Wno-unknown-pragmas
     -keep
     -keep-device-functions
-    -Xcompiler -fno-var-tracking  # Reduce GCC memory usage
+    # -Xcompiler -fno-var-tracking  # Reduce GCC memory usage
     # -Xcompiler=-save-temps 
     >
 )
