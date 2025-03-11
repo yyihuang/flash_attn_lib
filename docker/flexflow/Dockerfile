@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends wget sudo binut
 # Install Python3 with Miniconda
 ARG python_version "latest"
 RUN rm -rf /opt/conda && \
-RUN MINICONDA_SCRIPT_NAME=Miniconda3-latest-Linux-x86_64.sh; \
+    MINICONDA_SCRIPT_NAME=Miniconda3-latest-Linux-x86_64.sh; \
     if [ "$python_version" != "3.8" ] && [ "$python_version" != "3.9" ] && [ "$python_version" != "3.10" ] && [ "$python_version" != "3.11" ] && [ "$python_version" != "3.12" ] && [ "$python_version" != "latest" ]; then \
         echo "python_version '${python_version}' is not supported, please choose among {3.8, 3.9, 3.10, 3.11, 3.12 or latest (default)}"; \
         exit 1; \
@@ -129,5 +129,13 @@ RUN rm -rf /root/.cargo /root/.rustup && \
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV RUSTUP_HOME=/root/.rustup
 ENV CARGO_HOME=/root/.cargo
+
+# Set up CMake environment variables with torch
+ENV CMAKE_PREFIX_PATH="/opt/conda/lib/python3.10/site-packages/torch"
+
+# Set up CUDA environment variables
+ENV CUDA_HOME /usr/local/cuda
+ENV PATH $CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH $CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 ENTRYPOINT ["/bin/bash"]
