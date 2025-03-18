@@ -24,12 +24,12 @@ Here we provide a building environment in docker. You can build this `flash-attn
 
 Build the docker with image at this project root. You could take a look at all the dependencies in it.
 ```
-docker build -t flash-attn-build .
+docker build -t test .
 ```
 
 Run it in docker. (replace `/home/yingyih/workspace` with your local workspace to map as needed)
 ```
-docker run --gpus all --rm -it -v /home/yingyih/workspace:/workspace --user $(id -u):$(id -g) flash-attn-build
+docker run --gpus all --rm -it -v /home/yingyih/workspace:/workspace --user $(id -u):$(id -g) test
 ```
 
 Try to build in docker at root dir.
