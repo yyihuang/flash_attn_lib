@@ -10,7 +10,7 @@ from flash_attn import flash_attn_func
 # v: [batch_size, seqlen_v, num_heads_k, head_size]
 # num_heads_k != num_heads when MQA or GroupedAttention
 
-def torch_manual_attention(q, k, v, is_causal):
+def torch_manual_attention_fwd(q, k, v, is_causal):
     # q: [batch_size, seqlen_q, num_heads, head_size]
     # k: [batch_size, seqlen_k, num_heads_k, head_size]
     # v: [batch_size, seqlen_v, num_heads_k, head_size]
@@ -78,7 +78,7 @@ def torch_manual_attention(q, k, v, is_causal):
 
     return attn_out, manual_softmax_lse
 
-def torch_built_in_attention(q, k, v, is_causal):
+def torch_built_in_attention_fwd(q, k, v, is_causal):
     # Prepare k and v in the correct format for scaled_dot_product_attention
     q_permuted = q.permute(0, 2, 1, 3)
     k_permuted = k.permute(0, 2, 1, 3)
@@ -90,7 +90,7 @@ def torch_built_in_attention(q, k, v, is_causal):
     )
     return attn_out_torch
 
-def flash_attention(q, k, v, is_causal):
+def flash_attention_fwd(q, k, v, is_causal):
     # q: [batch_size, seqlen_q, num_heads, head_size]
     # k: [batch_size, seqlen_k, num_heads_k, head_size]
     # v: [batch_size, seqlen_v, num_heads_k, head_size]
@@ -114,6 +114,12 @@ def flash_attention(q, k, v, is_causal):
     # print("flash_attn_out.shape (after permute): [BATCH_SIZE, num_heads, seqlen_q, head_size]", flash_attn_out_permuted.shape)
     # print("flash_softmax_lse.shape:", flash_softmax_lse.shape)
     return flash_attn_out_permuted, flash_softmax_lse
+
+def torch_manual_attention_bwd(dout, q, k, v, out, softmax_lse, dq_, dk_, dv_, alibi_slopes_, p_dropout, softmax_scale, is_causal, window_size_left, window_size_right, softcap, deterministic, gen_, rng_state):
+    pass
+
+def flash_attention_bwd(dout, q, k, v, out, softmax_lse, dq_, dk_, dv_, alibi_slopes_, p_dropout, softmax_scale, is_causal, window_size_left, window_size_right, softcap, deterministic, gen_, rng_state):
+    pass
 
 def attention_out_closeness_test(manual_out_py, touch_out_py, flash_out_py, manual_out_cpp, mha_out_cpp, run_mha_fwd_out_cpp, atol_val, rtol_val):
     # check shape
@@ -201,6 +207,8 @@ if __name__ == "__main__":
     k = list(k.parameters())[0]
     v = torch.jit.load(root_path + "/v.pt")
     v = list(v.parameters())[0]
+
+    # load forward pass output from cpp
     run_mha_fwd_out_cpp = torch.jit.load(root_path + "/run_mha_fwd_out_cpp.pt")
     run_mha_fwd_out_cpp = list(run_mha_fwd_out_cpp.parameters())[0]
     run_mha_fwd_out_cpp = run_mha_fwd_out_cpp.permute(0, 2, 1, 3)
@@ -222,14 +230,34 @@ if __name__ == "__main__":
     manual_softmax_lse_cpp = torch.jit.load(root_path + "/manual_softmax_lse_cpp.pt")
     manual_softmax_lse_cpp = list(manual_softmax_lse_cpp.parameters())[0]
 
+    # load backward pass output from cpp
+    mha_bwd_dq_cpp = torch.jit.load(root_path + "/mha_bwd_dq_cpp.pt")
+    mha_bwd_dq_cpp = list(mha_bwd_dq_cpp.parameters())[0]
+
+    mha_bwd_dk_cpp = torch.jit.load(root_path + "/mha_bwd_dk_cpp.pt")
+    mha_bwd_dk_cpp = list(mha_bwd_dk_cpp.parameters())[0]
+
+    mha_bwd_dv_cpp = torch.jit.load(root_path + "/mha_bwd_dv_cpp.pt")
+    mha_bwd_dv_cpp = list(mha_bwd_dv_cpp.parameters())[0]
+
+    run_mha_bwd_dq_cpp = torch.jit.load(root_path + "/run_mha_bwd_dq_cpp.pt")
+    run_mha_bwd_dq_cpp = list(run_mha_bwd_dq_cpp.parameters())[0]
+
+    run_mha_bwd_dk_cpp = torch.jit.load(root_path + "/run_mha_bwd_dk_cpp.pt")
+    run_mha_bwd_dk_cpp = list(run_mha_bwd_dk_cpp.parameters())[0]
+
+    run_mha_bwd_dv_cpp = torch.jit.load(root_path + "/run_mha_bwd_dv_cpp.pt")
+    run_mha_bwd_dv_cpp = list(run_mha_bwd_dv_cpp.parameters())[0]
+    
+
     # print the shape of q, k, v, out_load_flash, out_load_manual
     print("q.shape:", q.shape)
     print("k.shape:", k.shape)
     print("v.shape:", v.shape)
 
-    manual_attn_out, manual_softmax_lse = torch_manual_attention(q, k, v, is_causal)
-    torch_attn_out = torch_built_in_attention(q, k, v, is_causal)    
-    flash_attn_out, flash_softmax_lse = flash_attention(q, k, v, is_causal)
+    manual_attn_out, manual_softmax_lse = torch_manual_attention_fwd(q, k, v, is_causal)
+    torch_attn_out = torch_built_in_attention_fwd(q, k, v, is_causal)    
+    flash_attn_out, flash_softmax_lse = flash_attention_fwd(q, k, v, is_causal)
 
     # compare attention out in forward pass
     attention_out_closeness_test(manual_attn_out, torch_attn_out, flash_attn_out, manual_out_cpp, mha_fwd_out_cpp, run_mha_fwd_out_cpp, atol_val, rtol_val)
@@ -237,12 +265,7 @@ if __name__ == "__main__":
     # compare softmax_lse in forward pass
     softmax_lse_closeness_test(manual_softmax_lse, flash_softmax_lse, manual_softmax_lse_cpp, mha_fwd_softmax_lse_cpp, run_mha_fwd_softmax_lse_cpp, atol_val, rtol_val)    
     
-    # print("out_load_flash: ", out_load_flash)
-    # print("out_load_mha_fwd: ", out_load_mha_fwd)
-    # print("out_load_manual: ", out_load_manual)
-    # print("manual_attn_out: ", manual_attn_out)
-    # print("torch_attn_out: ", torch_attn_out)
-    # print("flash_attn_out: ", flash_attn_out)
+    # compare backward pass output from manual, torch, and flash attention in py
 
 '''
 (flash) [yingyih@catalyst-0-15 flash_attention_lib]$ python3 /home/yingyih/workspace/flash-attn-integration/flash_attention_lib/test_python_if/test_torch_attention_loadQKV.py
