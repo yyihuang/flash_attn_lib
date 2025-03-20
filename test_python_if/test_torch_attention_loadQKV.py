@@ -80,15 +80,32 @@ def torch_manual_attention_fwd(q, k, v, is_causal):
 
 def torch_built_in_attention(q, k, v, is_causal, dout):
     # Prepare k and v in the correct format for scaled_dot_product_attention
-    q_permuted = q.permute(0, 2, 1, 3)
-    k_permuted = k.permute(0, 2, 1, 3)
-    v_permuted = v.permute(0, 2, 1, 3)
+    q_permuted = q.clone().detach().permute(0, 2, 1, 3)
+    k_permuted = k.clone().detach().permute(0, 2, 1, 3)
+    v_permuted = v.clone().detach().permute(0, 2, 1, 3)
+
+    q_permuted.requires_grad = True
+    k_permuted.requires_grad = True
+    v_permuted.requires_grad = True
     
     attn_out_torch = torch.nn.functional.scaled_dot_product_attention(
         q_permuted, k_permuted, v_permuted, 
         is_causal=is_causal,
     )
-    return attn_out_torch
+
+    # backward pass
+    dout = dout.clone().detach().permute(0, 2, 1, 3)
+    attn_out_torch.backward(dout)
+    dq = q_permuted.grad
+    dk = k_permuted.grad
+    dv = v_permuted.grad
+
+    # permute dq, dk, dv to match the shape of q, k, v
+    dq = dq.permute(0, 2, 1, 3)
+    dk = dk.permute(0, 2, 1, 3)
+    dv = dv.permute(0, 2, 1, 3)
+
+    return attn_out_torch, dq, dk, dv
 
 def flash_attention(q, k, v, is_causal, dout):
     # q: [batch_size, seqlen_q, num_heads, head_size]
@@ -178,7 +195,7 @@ def softmax_lse_closeness_test(manual_softmax_lse_py, flash_softmax_lse_py, manu
             max_diff = torch.max(torch.abs(value - run_mha_fwd_softmax_lse_cpp))
             print("Maximum absolute difference:", max_diff.item())
 
-def grad_closeness_test(flash_dq_py, flash_dk_py, flash_dv_py, mha_bwd_dq_cpp, mha_bwd_dk_cpp, mha_bwd_dv_cpp, run_mha_bwd_dq_cpp, run_mha_bwd_dk_cpp, run_mha_bwd_dv_cpp, atol_val, rtol_val):
+def grad_closeness_test(flash_dq_py, flash_dk_py, flash_dv_py, torch_dq_py, torch_dk_py, torch_dv_py, mha_bwd_dq_cpp, mha_bwd_dk_cpp, mha_bwd_dv_cpp, run_mha_bwd_dq_cpp, run_mha_bwd_dk_cpp, run_mha_bwd_dv_cpp, atol_val, rtol_val):
     # check shape
     # print("flash_dq_py.shape:", flash_dq_py.shape)
     # print("flash_dk_py.shape:", flash_dk_py.shape)
@@ -193,16 +210,19 @@ def grad_closeness_test(flash_dq_py, flash_dk_py, flash_dv_py, mha_bwd_dq_cpp, m
     # store name and tensors to a dictionary
     dq_dict = {
         "flash_dq_py": flash_dq_py,
+        "torch_dq_py": torch_dq_py,
         "mha_bwd_dq_cpp": mha_bwd_dq_cpp,
         # "run_mha_bwd_dq_cpp": run_mha_bwd_dq_cpp,
     }
     dk_dict = {
         "flash_dk_py": flash_dk_py,
+        "torch_dk_py": torch_dk_py,
         "mha_bwd_dk_cpp": mha_bwd_dk_cpp,
         # "run_mha_bwd_dk_cpp": run_mha_bwd_dk_cpp,
     }   
     dv_dict = {
         "flash_dv_py": flash_dv_py,
+        "torch_dv_py": torch_dv_py,
         "mha_bwd_dv_cpp": mha_bwd_dv_cpp,
         # "run_mha_bwd_dv_cpp": run_mha_bwd_dv_cpp,
     }
@@ -316,7 +336,7 @@ if __name__ == "__main__":
     print("v.shape:", v.shape)
 
     manual_attn_out, manual_softmax_lse = torch_manual_attention_fwd(q, k, v, is_causal)
-    torch_attn_out = torch_built_in_attention(q, k, v, is_causal, dout)    
+    torch_attn_out, torch_dq_py, torch_dk_py, torch_dv_py = torch_built_in_attention(q, k, v, is_causal, dout)    
     flash_attn_out, flash_softmax_lse, flash_dq_py, flash_dk_py, flash_dv_py = flash_attention(q, k, v, is_causal, dout)
 
     # compare attention out in forward pass
@@ -326,7 +346,7 @@ if __name__ == "__main__":
     softmax_lse_closeness_test(manual_softmax_lse, flash_softmax_lse, manual_softmax_lse_cpp, mha_fwd_softmax_lse_cpp, run_mha_fwd_softmax_lse_cpp, atol_val, rtol_val)    
     
     # compare backward pass output from manual, torch, and flash attention in py
-    grad_closeness_test(flash_dq_py, flash_dk_py, flash_dv_py, mha_bwd_dq_cpp, mha_bwd_dk_cpp, mha_bwd_dv_cpp, run_mha_bwd_dq_cpp, run_mha_bwd_dk_cpp, run_mha_bwd_dv_cpp, atol_val, rtol_val)
+    grad_closeness_test(flash_dq_py, flash_dk_py, flash_dv_py, torch_dq_py, torch_dk_py, torch_dv_py, mha_bwd_dq_cpp, mha_bwd_dk_cpp, mha_bwd_dv_cpp, run_mha_bwd_dq_cpp, run_mha_bwd_dk_cpp, run_mha_bwd_dv_cpp, atol_val, rtol_val)
 '''
 (flash) [yingyih@catalyst-0-15 flash_attention_lib]$ python3 /home/yingyih/workspace/flash-attn-integration/flash_attention_lib/test_python_if/test_torch_attention_loadQKV.py
 Using device: cuda
