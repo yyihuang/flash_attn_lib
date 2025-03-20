@@ -59,11 +59,16 @@ void torch_attention_forward_matmul(
     }
 
     // Compute softmax
-    // auto attn_weights = torch::softmax(scores, -1);
     auto max_scores = std::get<0>(scores.max(-1, true)); // Max per row for stability
     auto exp_scores = (scores - max_scores).exp();
     auto sum_exp_scores = exp_scores.sum(-1, true);
     auto attn_weights = exp_scores / sum_exp_scores;
+
+    // get softmax_lse
+    auto torch_softmax_lse = torch::log(sum_exp_scores);
+    torch_softmax_lse = torch_softmax_lse.squeeze(-1);
+    // add max scores to softmax_lse
+    torch_softmax_lse = torch_softmax_lse + max_scores.squeeze(-1);
 
     // Compute attention output
     auto torch_out = torch::matmul(attn_weights, v_compute);
@@ -71,7 +76,7 @@ void torch_attention_forward_matmul(
     // Reorder torch_out to [batch_size, seqlen_q, num_heads, head_size]
     torch_out = torch_out.permute({0, 2, 1, 3});
 
-    // closeness check
+    // closeness check: out vs torch_out
     auto out_fp32 = out.to(torch::kFloat32);
     auto torch_out_fp32 = torch_out.to(torch::kFloat32);
     auto diff = (out_fp32 - torch_out_fp32);
@@ -79,11 +84,8 @@ void torch_attention_forward_matmul(
     std::cout << "Max difference between Flash Attention and PyTorch attention "
                  "outputs: "
               << max_diff << std::endl;
-    torch::save(out.clone().detach(), "flash_out.pt");
-    torch::save(torch_out.clone().detach(), "torch_out.pt");
-    std::cout << "out[0][0][0][0]: " << out[0][0][0][0] << std::endl;
-    std::cout << "torch_out[0][0][0][0]: " << torch_out[0][0][0][0] << std::endl;
-    // std::cout << "diff: " << diff[0][0][0] << std::endl;
+    torch::save(out.clone().detach(), "run_mha_fwd_out_cpp.pt");
+    torch::save(torch_out.clone().detach(), "manual_out_cpp.pt");
 
     if (max_diff > 1e-3)
     {
@@ -91,6 +93,23 @@ void torch_attention_forward_matmul(
         std::cout << "flash_out.shape: " << out.sizes() << std::endl;
         std::cout << "torch_out.shape: " << torch_out.sizes() << std::endl;
         std::cout << "Warning: Large difference detected in attention outputs!"
+                  << std::endl;
+    }
+
+    // closeness check: softmax_lse vs torch_softmax_lse
+    std::cout << "softmax_lse.shape: " << softmax_lse.sizes() << std::endl;
+    std::cout << "torch_softmax_lse.shape: " << torch_softmax_lse.sizes() << std::endl;
+    auto diff_softmax_lse = (softmax_lse - torch_softmax_lse);
+    auto max_diff_softmax_lse = diff_softmax_lse.abs().max().item<float>();
+    std::cout << "Max difference between Flash Attention and PyTorch attention "
+                 "softmax_lse: "
+              << max_diff_softmax_lse << std::endl;
+    torch::save(torch_softmax_lse.clone().detach(), "manual_softmax_lse_cpp.pt");
+    torch::save(softmax_lse.clone().detach(), "run_mha_fwd_softmax_lse_cpp.pt");
+
+    if (max_diff_softmax_lse > 1e-3)
+    {
+        std::cout << "Warning: Large difference detected in softmax_lse!"
                   << std::endl;
     }
 }
@@ -109,9 +128,9 @@ int main()
         std::cout << "CUDA available: " << torch::cuda::is_available() << std::endl;
         std::cout << "CUDNN available: " << torch::cuda::cudnn_is_available() << std::endl;
 
-        int batch_size = 1, seqlen_q = 2, seqlen_k = 2;
-        int num_heads = 1, num_heads_k = 1, head_size = 8;
-        float p_dropout = 0.1f, softmax_scale = 1.0 / sqrt(head_size), softcap = 0.0f;
+        int batch_size = 1, seqlen_q = 64, seqlen_k = 64;
+        int num_heads = 8, num_heads_k = 8, head_size = 128;
+        float p_dropout = 0.0f, softmax_scale = 1.0f / sqrt(head_size), softcap = 0.0f;
         bool return_softmax = false, is_causal = true;
         int window_size_left = -1, window_size_right = -1;
         // add alibi slopes. ALiBi slopes must have dtype fp32
@@ -144,16 +163,14 @@ int main()
         // Forward pass
         std::vector<at::Tensor> mha_fwd_output;
         mha_fwd_output = flash::mha_fwd(q, k, v, out_, alibi_slopes_,
-                                    p_dropout, softmax_scale, is_causal,
-                                    window_size_left, window_size_right,
-                                    softcap, return_softmax, gen_);
+                                        p_dropout, softmax_scale, is_causal,
+                                        window_size_left, window_size_right,
+                                        softcap, return_softmax, gen_);
         auto mha_fwd_out = mha_fwd_output[0];
         auto mha_fwd_softmax_lse = mha_fwd_output[1];
         // save tensor to file
-        torch::save(mha_fwd_out.clone().detach(), "mha_fwd_out.pt");
-        torch::save(mha_fwd_softmax_lse.clone().detach(), "mha_fwd_softmax_lse.pt");
-
-        
+        torch::save(mha_fwd_out.clone().detach(), "mha_fwd_out_cpp.pt");
+        torch::save(mha_fwd_softmax_lse.clone().detach(), "mha_fwd_softmax_lse_cpp.pt");
 
         if (window_size_left >= seqlen_k)
         {

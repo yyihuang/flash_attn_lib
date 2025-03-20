@@ -115,75 +115,72 @@ def flash_attention(q, k, v, is_causal):
     # print("flash_softmax_lse.shape:", flash_softmax_lse.shape)
     return flash_attn_out_permuted, flash_softmax_lse
 
-def attn_out_closeness(manual_attn_out, torch_attn_out, flash_attn_out):
-    # compare the results: manual vs torch
-    comparison_result = torch.allclose(manual_attn_out, torch_attn_out, atol=atol_val, rtol=rtol_val)
-    print("manual_attn_out == torch_attn_out:", comparison_result)
+def attention_out_closeness_test(manual_out_py, touch_out_py, flash_out_py, manual_out_cpp, mha_out_cpp, run_mha_fwd_out_cpp, atol_val, rtol_val):
+    # check shape
+    print("manual_out_py.shape:", manual_out_py.shape)
+    print("touch_out_py.shape:", touch_out_py.shape)
+    print("flash_out_py.shape:", flash_out_py.shape)
+    print("manual_out_cpp.shape:", manual_out_cpp.shape)
+    print("mha_out_cpp.shape:", mha_out_cpp.shape)
+    print("run_mha_fwd_out_cpp.shape:", run_mha_fwd_out_cpp.shape)
 
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(manual_attn_out - torch_attn_out))
-        print("Maximum absolute difference:", max_diff.item())
+    # store name and tensors to a dictionary
+    tensors_dict = {
+        "manual_out_py": manual_out_py,
+        "touch_out_py": touch_out_py,
+        "flash_out_py": flash_out_py,
+        "manual_out_cpp": manual_out_cpp,
+        "mha_out_cpp": mha_out_cpp,
+    }
 
-    # compare the results: manual vs flash
-    comparison_result = torch.allclose(manual_attn_out, flash_attn_out, atol=atol_val, rtol=rtol_val)
-    print("manual_attn_out == flash_attn_out:", comparison_result)
+    # compare all the tensors in the dictionary
+    for key, value in tensors_dict.items():
+        print(f"{key}.shape:", value.shape)
+        # compare value with run_mha_fwd_out_cpp
+        comparison_result = torch.allclose(value, run_mha_fwd_out_cpp, atol=atol_val, rtol=rtol_val)
+        print(f"{key} == run_mha_fwd_out_cpp:", comparison_result)
 
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(manual_attn_out - flash_attn_out))
-        print("Maximum absolute difference:", max_diff.item())
+        if not comparison_result:
+            max_diff = torch.max(torch.abs(value - run_mha_fwd_out_cpp))
+            print("Maximum absolute difference:", max_diff.item())
 
-    # compare the results: torch vs flash
-    comparison_result = torch.allclose(torch_attn_out, flash_attn_out, atol=atol_val, rtol=rtol_val)
-    print("torch_attn_out == flash_attn_out:", comparison_result)
+def softmax_lse_closeness_test(manual_softmax_lse_py, flash_softmax_lse_py, manual_softmax_lse_cpp, mha_fwd_softmax_lse_cpp, run_mha_fwd_softmax_lse_cpp, atol_val, rtol_val):
+    # convert all tensors to float32
+    manual_softmax_lse_py = manual_softmax_lse_py.to(torch.float32)
+    flash_softmax_lse_py = flash_softmax_lse_py.to(torch.float32)
+    manual_softmax_lse_cpp = manual_softmax_lse_cpp.to(torch.float32)
+    mha_fwd_softmax_lse_cpp = mha_fwd_softmax_lse_cpp.to(torch.float32)
+    run_mha_fwd_softmax_lse_cpp = run_mha_fwd_softmax_lse_cpp.to(torch.float32)
 
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(torch_attn_out - flash_attn_out))
-        print("Maximum absolute difference:", max_diff.item())
-    
-def softmax_lse_closeness(manual_softmax_lse, flash_softmax_lse):
-    # convert to float32
-    manual_softmax_lse = manual_softmax_lse.to(torch.float32)
-    flash_softmax_lse = flash_softmax_lse.to(torch.float32)
+    # check shape
+    print("manual_softmax_lse_py.shape:", manual_softmax_lse_py.shape)
+    print("flash_softmax_lse_py.shape:", flash_softmax_lse_py.shape)
+    print("manual_softmax_lse_cpp.shape:", manual_softmax_lse_cpp.shape)
+    print("mha_fwd_softmax_lse_cpp.shape:", mha_fwd_softmax_lse_cpp.shape)
+    print("run_mha_fwd_softmax_lse_cpp.shape:", run_mha_fwd_softmax_lse_cpp.shape)
 
-    comparison_result = torch.allclose(manual_softmax_lse, flash_softmax_lse, atol=atol_val, rtol=rtol_val)
-    print("manual_softmax_lse == flash_softmax_lse:", comparison_result)
+    # store name and tensors to a dictionary
+    tensors_dict = {
+        "manual_softmax_lse_py": manual_softmax_lse_py,
+        "flash_softmax_lse_py": flash_softmax_lse_py,
+        "manual_softmax_lse_cpp": manual_softmax_lse_cpp,
+        "mha_fwd_softmax_lse_cpp": mha_fwd_softmax_lse_cpp,
+    }
 
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(manual_softmax_lse - flash_softmax_lse))
-        print("Maximum absolute difference:", max_diff.item())
+    # compare all the tensors in the dictionary
+    for key, value in tensors_dict.items():
+        print(f"{key}.shape:", value.shape)
+        # compare value with run_mha_fwd_softmax_lse_cpp
+        comparison_result = torch.allclose(value, run_mha_fwd_softmax_lse_cpp, atol=atol_val, rtol=rtol_val)
+        print(f"{key} == run_mha_fwd_softmax_lse_cpp:", comparison_result)
 
-def loaded_out_closeness(out_load_flash, out_load_manual, manual_attn_out, flash_attn_out):
-    # compare flash_attn_out: python vs cpp
-    comparison_result = torch.allclose(out_load_flash, flash_attn_out, atol=atol_val, rtol=rtol_val)
-    print("out_load_flash == flash_attn_out:", comparison_result)
-
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(out_load_flash - flash_attn_out))
-        print("Maximum absolute difference:", max_diff.item())
-
-    # compare manual_attn_out: python vs cpp
-    comparison_result = torch.allclose(out_load_manual, manual_attn_out, atol=atol_val, rtol=rtol_val)
-    print("out_load_manual == manual_attn_out:", comparison_result)
-
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(out_load_flash - manual_attn_out))
-        print("Maximum absolute difference:", max_diff.item())
-    
-    # compare cpp out: flash vs manual
-    comparison_result = torch.allclose(out_load_flash, out_load_manual, atol=atol_val, rtol=rtol_val)
-    print("out_load_flash == out_load_manual:", comparison_result)
-
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(out_load_flash - out_load_manual))
-        print("Maximum absolute difference:", max_diff.item())
+        if not comparison_result:
+            max_diff = torch.max(torch.abs(value - run_mha_fwd_softmax_lse_cpp))
+            print("Maximum absolute difference:", max_diff.item())
 
 if __name__ == "__main__":
 
     BATCH_SIZE = 1
-    # seqlen_q = 8
-    # seqlen_k = 8
-    # num_heads = 1
-    # head_size = 8
     is_causal = True
 
     # Check if CUDA is available
@@ -192,8 +189,8 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # Set common tolerance levels for all comparisons
-    atol_val = 1e-2
-    rtol_val = 1e-2
+    atol_val = 1e-3
+    rtol_val = 1e-3
     print(f"Using comparison tolerances: atol={atol_val}, rtol={rtol_val}")
 
     # load q, k, v tensor from file
@@ -204,55 +201,87 @@ if __name__ == "__main__":
     k = list(k.parameters())[0]
     v = torch.jit.load(root_path + "/v.pt")
     v = list(v.parameters())[0]
-    out_load_flash = torch.jit.load(root_path + "/flash_out.pt")
-    out_load_mha_fwd = torch.jit.load(root_path + "/mha_fwd_out.pt")
-    out_load_flash = list(out_load_flash.parameters())[0]
-    out_load_flash = out_load_flash.permute(0, 2, 1, 3)
-    out_load_mha_fwd = list(out_load_mha_fwd.parameters())[0]
-    out_load_mha_fwd = out_load_mha_fwd.permute(0, 2, 1, 3)
-    out_load_manual = torch.jit.load(root_path + "/torch_out.pt")
-    out_load_manual = list(out_load_manual.parameters())[0]
-    out_load_manual = out_load_manual.permute(0, 2, 1, 3)
+    run_mha_fwd_out_cpp = torch.jit.load(root_path + "/run_mha_fwd_out_cpp.pt")
+    run_mha_fwd_out_cpp = list(run_mha_fwd_out_cpp.parameters())[0]
+    run_mha_fwd_out_cpp = run_mha_fwd_out_cpp.permute(0, 2, 1, 3)
+
+    mha_fwd_out_cpp = torch.jit.load(root_path + "/mha_fwd_out_cpp.pt")
+    mha_fwd_out_cpp = list(mha_fwd_out_cpp.parameters())[0]
+    mha_fwd_out_cpp = mha_fwd_out_cpp.permute(0, 2, 1, 3)
+
+    manual_out_cpp = torch.jit.load(root_path + "/manual_out_cpp.pt")
+    manual_out_cpp = list(manual_out_cpp.parameters())[0]
+    manual_out_cpp = manual_out_cpp.permute(0, 2, 1, 3)
+
+    run_mha_fwd_softmax_lse_cpp = torch.jit.load(root_path + "/run_mha_fwd_softmax_lse_cpp.pt")
+    run_mha_fwd_softmax_lse_cpp = list(run_mha_fwd_softmax_lse_cpp.parameters())[0]
+    
+    mha_fwd_softmax_lse_cpp = torch.jit.load(root_path + "/mha_fwd_softmax_lse_cpp.pt")
+    mha_fwd_softmax_lse_cpp = list(mha_fwd_softmax_lse_cpp.parameters())[0]
+
+    manual_softmax_lse_cpp = torch.jit.load(root_path + "/manual_softmax_lse_cpp.pt")
+    manual_softmax_lse_cpp = list(manual_softmax_lse_cpp.parameters())[0]
+
     # print the shape of q, k, v, out_load_flash, out_load_manual
     print("q.shape:", q.shape)
     print("k.shape:", k.shape)
     print("v.shape:", v.shape)
-    print("out_load_flash.shape:", out_load_flash.shape)
-    print("out_load_manual.shape:", out_load_manual.shape)
 
     manual_attn_out, manual_softmax_lse = torch_manual_attention(q, k, v, is_causal)
     torch_attn_out = torch_built_in_attention(q, k, v, is_causal)    
     flash_attn_out, flash_softmax_lse = flash_attention(q, k, v, is_causal)
 
-    print("attn_out_load_flash[0][0][0][0]:", out_load_flash[0][0][0][0])
-    print("attn_out_mha_fwd[0][0][0][0]:", out_load_mha_fwd[0][0][0][0])
-    print("attn_out_load_manual[0][0][0][0]:", out_load_manual[0][0][0][0])
-    print("attn_out_manual[0][0][0][0]:", manual_attn_out[0][0][0][0])
-    print("attn_out_torch[0][0][0][0]:", torch_attn_out[0][0][0][0])
-    print("attn_out_flash[0][0][0][0]:", flash_attn_out[0][0][0][0])
-
-    print("manual_attn_out.shape:", manual_attn_out.shape)
-    print("manual_softmax_lse.shape:", manual_softmax_lse.shape)
-
-    attn_out_closeness(manual_attn_out, torch_attn_out, flash_attn_out)
-    softmax_lse_closeness(manual_softmax_lse, flash_softmax_lse)
-
-    loaded_out_closeness(out_load_flash, out_load_manual, manual_attn_out, flash_attn_out)
-
-    # compare out_load_flash vs out_load_mha_fwd
-    comparison_result = torch.allclose(out_load_flash, out_load_mha_fwd, atol=atol_val, rtol=rtol_val)
-    print("out_load_flash == out_load_mha_fwd:", comparison_result)
-
-    if not comparison_result:
-        max_diff = torch.max(torch.abs(out_load_flash - out_load_mha_fwd))
-        print("Maximum absolute difference:", max_diff.item())
+    # compare attention out in forward pass
+    attention_out_closeness_test(manual_attn_out, torch_attn_out, flash_attn_out, manual_out_cpp, mha_fwd_out_cpp, run_mha_fwd_out_cpp, atol_val, rtol_val)
     
-    print("out_load_flash: ", out_load_flash)
-    print("out_load_mha_fwd: ", out_load_mha_fwd)
-    print("out_load_manual: ", out_load_manual)
-    print("manual_attn_out: ", manual_attn_out)
-    print("torch_attn_out: ", torch_attn_out)
-    print("flash_attn_out: ", flash_attn_out)
+    # compare softmax_lse in forward pass
+    softmax_lse_closeness_test(manual_softmax_lse, flash_softmax_lse, manual_softmax_lse_cpp, mha_fwd_softmax_lse_cpp, run_mha_fwd_softmax_lse_cpp, atol_val, rtol_val)    
+    
+    # print("out_load_flash: ", out_load_flash)
+    # print("out_load_mha_fwd: ", out_load_mha_fwd)
+    # print("out_load_manual: ", out_load_manual)
+    # print("manual_attn_out: ", manual_attn_out)
+    # print("torch_attn_out: ", torch_attn_out)
+    # print("flash_attn_out: ", flash_attn_out)
 
+'''
+(flash) [yingyih@catalyst-0-15 flash_attention_lib]$ python3 /home/yingyih/workspace/flash-attn-integration/flash_attention_lib/test_python_if/test_torch_attention_loadQKV.py
+Using device: cuda
+Using comparison tolerances: atol=0.001, rtol=0.001
+q.shape: torch.Size([1, 64, 8, 128])
+k.shape: torch.Size([1, 64, 8, 128])
+v.shape: torch.Size([1, 64, 8, 128])
+manual_out_py.shape: torch.Size([1, 8, 64, 128])
+touch_out_py.shape: torch.Size([1, 8, 64, 128])
+flash_out_py.shape: torch.Size([1, 8, 64, 128])
+manual_out_cpp.shape: torch.Size([1, 8, 64, 128])
+mha_out_cpp.shape: torch.Size([1, 8, 64, 128])
+run_mha_fwd_out_cpp.shape: torch.Size([1, 8, 64, 128])
+manual_out_py.shape: torch.Size([1, 8, 64, 128])
+manual_out_py == run_mha_fwd_out_cpp: False
+Maximum absolute difference: 0.001953125
+touch_out_py.shape: torch.Size([1, 8, 64, 128])
+touch_out_py == run_mha_fwd_out_cpp: True
+flash_out_py.shape: torch.Size([1, 8, 64, 128])
+flash_out_py == run_mha_fwd_out_cpp: True
+manual_out_cpp.shape: torch.Size([1, 8, 64, 128])
+manual_out_cpp == run_mha_fwd_out_cpp: False
+Maximum absolute difference: 0.001953125
+mha_out_cpp.shape: torch.Size([1, 8, 64, 128])
+mha_out_cpp == run_mha_fwd_out_cpp: True
+manual_softmax_lse_py.shape: torch.Size([1, 8, 64])
+flash_softmax_lse_py.shape: torch.Size([1, 8, 64])
+manual_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
+mha_fwd_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
+run_mha_fwd_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
+manual_softmax_lse_py.shape: torch.Size([1, 8, 64])
+manual_softmax_lse_py == run_mha_fwd_softmax_lse_cpp: True
+flash_softmax_lse_py.shape: torch.Size([1, 8, 64])
+flash_softmax_lse_py == run_mha_fwd_softmax_lse_cpp: True
+manual_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
+manual_softmax_lse_cpp == run_mha_fwd_softmax_lse_cpp: True
+mha_fwd_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
+mha_fwd_softmax_lse_cpp == run_mha_fwd_softmax_lse_cpp: True
+'''
 
 
