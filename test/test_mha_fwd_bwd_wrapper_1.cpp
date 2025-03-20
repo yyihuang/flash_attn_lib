@@ -305,6 +305,9 @@ std::vector<at::Tensor> _wrapper_mha_fwd_1(at::Tensor &q,                       
         softmax_lse = softmax_lse.reshape({batch_size, num_heads_k * seqlen_q, 1});
     }
     return {out, softmax_lse, p, rng_state};
+    
+    // return an array of empty tensors
+    return {torch::empty({0}), torch::empty({0}), torch::empty({0}), torch::empty({0})};
 }
 
 std::vector<at::Tensor> _wrapper_mha_bwd_1(const at::Tensor &dout,                   // batch_size x seqlen_q x num_heads, x multiple_of(head_size_og, 8)
@@ -599,13 +602,6 @@ int main()
         std::optional<at::Tensor> dv_ = std::nullopt;
         bool deterministic = false;
 
-        std::cout << "dq: " << dq.sizes() << std::endl;
-        std::cout << "dk: " << dk.sizes() << std::endl;
-        std::cout << "dv: " << dv.sizes() << std::endl;
-        torch::save(dq.clone().detach(), "run_mha_bwd_dq_cpp.pt");
-        torch::save(dk.clone().detach(), "run_mha_bwd_dk_cpp.pt");
-        torch::save(dv.clone().detach(), "run_mha_bwd_dv_cpp.pt");
-
         // test _wrapper_1 interface
         at::Tensor dout;
         {
@@ -613,9 +609,9 @@ int main()
             auto q_1 = q.clone().detach();
             auto k_1 = k.clone().detach();
             auto v_1 = v.clone().detach();
-            std::optional<at::Tensor> dq_1 = std::nullopt;
-            std::optional<at::Tensor> dk_1 = std::nullopt;
-            std::optional<at::Tensor> dv_1 = std::nullopt;
+            std::optional<at::Tensor> dq_ = torch::empty_like(q);
+            std::optional<at::Tensor> dk_ = torch::empty_like(k);
+            std::optional<at::Tensor> dv_ = torch::empty_like(v);
 
             // test mha_fwd_1 interface
             auto mha_fwd_output = _wrapper_mha_fwd_1(q_1, k_1, v_1, out_, alibi_slopes_,
@@ -630,20 +626,20 @@ int main()
             torch::save(mha_fwd_out.clone().detach(), "run_mha_fwd_out_cpp.pt");
             torch::save(mha_fwd_softmax_lse.clone().detach(), "run_mha_fwd_softmax_lse_cpp.pt");
 
-            // dout = torch::randn_like(mha_fwd_out);
-            // torch::save(dout.clone().detach(), "run_mha_bwd_dout_cpp.pt");
+            dout = torch::randn_like(mha_fwd_out);
+            torch::save(dout.clone().detach(), "dout.pt");
 
-            // // test mha_bwd_1 interface
-            // auto mha_bwd_output = _wrapper_mha_bwd_1(dout, q_1, k_1, v_1, mha_fwd_out, mha_fwd_softmax_lse, dq_1, dk_1, dv_1, alibi_slopes_,
-            //                                         p_dropout, softmax_scale, is_causal,
-            //                                         window_size_left, window_size_right,
-            //                                         softcap, deterministic, gen_, rng_state, stream);
-            // torch::save(dq_1.value().clone().detach(), "run_mha_bwd_dq_cpp.pt");
-            // torch::save(dk_1.value().clone().detach(), "run_mha_bwd_dk_cpp.pt");
-            // torch::save(dv_1.value().clone().detach(), "run_mha_bwd_dv_cpp.pt");
+            // test mha_bwd_1 interface
+            auto mha_bwd_output = _wrapper_mha_bwd_1(dout, q_1, k_1, v_1, mha_fwd_out, mha_fwd_softmax_lse, dq_, dk_, dv_, alibi_slopes_,
+                                                    p_dropout, softmax_scale, is_causal,
+                                                    window_size_left, window_size_right,
+                                                    softcap, deterministic, gen_, rng_state, stream);
+            torch::save(dq_.value().clone().detach(), "run_mha_bwd_dq_cpp.pt");
+            torch::save(dk_.value().clone().detach(), "run_mha_bwd_dk_cpp.pt");
+            torch::save(dv_.value().clone().detach(), "run_mha_bwd_dv_cpp.pt");
 
-            // // test my handwritten attn interface
-            // torch_attention_forward_matmul(q, k, v, mha_fwd_out, mha_fwd_softmax_lse, is_causal);
+            // test my handwritten attn interface
+            torch_attention_forward_matmul(q, k, v, mha_fwd_out, mha_fwd_softmax_lse, is_causal);
         }
 
         
