@@ -9,15 +9,9 @@
 #include "flash_api.h"
 
 void torch_attention_forward_matmul(
-    at::Tensor const &q, // shape: [batch_size, seqlen_q, num_heads, head_size]
-    at::Tensor const
-        &k, // shape: [batch_size, seqlen_k, num_heads_k, head_size]
-    at::Tensor const
-        &v, // shape: [batch_size, seqlen_k, num_heads_k, head_size]
-    at::Tensor const
-        &out, // shape: [batch_size, seqlen_q, num_heads, head_size]
-    at::Tensor const
-        &softmax_lse, // shape: [batch_size, num_heads, seqlen_q, 1]
+    at::Tensor const &q, // [batch_size, seqlen_q, num_heads, head_size]
+    at::Tensor const &k, // [batch_size, seqlen_k, num_heads_k, head_size]
+    at::Tensor const &v, // [batch_size, seqlen_k, num_heads_k, head_size]
     bool is_causal)
 {
     // Get shape
@@ -55,7 +49,6 @@ void torch_attention_forward_matmul(
         auto mask = torch::zeros({seqlen_q, seqlen_k}, q.options());
         mask = torch::triu(mask, /*diagonal=*/1).masked_fill(torch::triu(torch::ones({seqlen_q, seqlen_k}, q.options()), 1) == 1, -std::numeric_limits<float>::infinity());
         scores = scores + mask.unsqueeze(0).unsqueeze(0);
-        // std::cout << "mask: " << mask << std::endl;
     }
 
     // Compute softmax
@@ -76,42 +69,8 @@ void torch_attention_forward_matmul(
     // Reorder torch_out to [batch_size, seqlen_q, num_heads, head_size]
     torch_out = torch_out.permute({0, 2, 1, 3});
 
-    // closeness check: out vs torch_out
-    auto out_fp32 = out.to(torch::kFloat32);
-    auto torch_out_fp32 = torch_out.to(torch::kFloat32);
-    auto diff = (out_fp32 - torch_out_fp32);
-    auto max_diff = diff.abs().max().item<float>();
-    std::cout << "Max difference between Flash Attention and PyTorch attention "
-                 "outputs: "
-              << max_diff << std::endl;
-    torch::save(out.clone().detach(), "run_mha_fwd_out_cpp.pt");
     torch::save(torch_out.clone().detach(), "manual_out_cpp.pt");
-
-    if (max_diff > 1e-3)
-    {
-        // print the shape of out and torch_out
-        std::cout << "flash_out.shape: " << out.sizes() << std::endl;
-        std::cout << "torch_out.shape: " << torch_out.sizes() << std::endl;
-        std::cout << "Warning: Large difference detected in attention outputs!"
-                  << std::endl;
-    }
-
-    // closeness check: softmax_lse vs torch_softmax_lse
-    std::cout << "softmax_lse.shape: " << softmax_lse.sizes() << std::endl;
-    std::cout << "torch_softmax_lse.shape: " << torch_softmax_lse.sizes() << std::endl;
-    auto diff_softmax_lse = (softmax_lse - torch_softmax_lse);
-    auto max_diff_softmax_lse = diff_softmax_lse.abs().max().item<float>();
-    std::cout << "Max difference between Flash Attention and PyTorch attention "
-                 "softmax_lse: "
-              << max_diff_softmax_lse << std::endl;
     torch::save(torch_softmax_lse.clone().detach(), "manual_softmax_lse_cpp.pt");
-    torch::save(softmax_lse.clone().detach(), "run_mha_fwd_softmax_lse_cpp.pt");
-
-    if (max_diff_softmax_lse > 1e-3)
-    {
-        std::cout << "Warning: Large difference detected in softmax_lse!"
-                  << std::endl;
-    }
 }
 
 std::vector<at::Tensor> _wrapper_mha_fwd_1(at::Tensor &q,                            // batch_size x seqlen_q x num_heads x round_multiple(head_size, 8)
@@ -642,7 +601,7 @@ int main()
             torch::save(dv_.value().clone().detach(), "run_mha_bwd_dv_cpp.pt");
 
             // test my handwritten attn interface
-            torch_attention_forward_matmul(q, k, v, mha_fwd_out, mha_fwd_softmax_lse, is_causal);
+            torch_attention_forward_matmul(q, k, v, is_causal);
         }
 
         

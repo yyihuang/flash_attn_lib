@@ -9,6 +9,10 @@ The demo is to
 
 The exported flash-attn API should be declared in `3rd_party/flash_api.h`. The signature should be **consistent** with the one in source code. 
 
+All the examples are under `test` directory. We suggest you follow the examples in `test/test_mha_fwd_bwd_wrapper_1.cpp` and `test/test_mha_fwd_bwd_wrapper_2.cpp` to wrap the flash-attn API.
+
+The closeness tests are provided in python under `test_python_if/test_torch_attention_loadQKV.py`, where you could verify the attention results from C++ tests under `test` directory.
+
 [Recommended practice of file organization]
 You could try to have you own APIs declared in `csrc/flash_attn.h`, and implement them with the pre-compiled flash-attn functions by `#include "flash_api.h"` in `csrc/flash_attn.cpp`.
 
