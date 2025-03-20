@@ -15,6 +15,12 @@ def torch_manual_attention(q, k, v, is_causal):
     # k: [batch_size, seqlen_k, num_heads_k, head_size]
     # v: [batch_size, seqlen_v, num_heads_k, head_size]
 
+    batch_size = q.shape[0]
+    seqlen_q = q.shape[1]
+    num_heads = q.shape[2]
+    head_size = q.shape[-1]
+    seqlen_k = k.shape[1]
+
     # Define scaling factor
     scaling_factor = 1.0 / math.sqrt(head_size)
 
@@ -88,6 +94,8 @@ def flash_attention(q, k, v, is_causal):
     # q: [batch_size, seqlen_q, num_heads, head_size]
     # k: [batch_size, seqlen_k, num_heads_k, head_size]
     # v: [batch_size, seqlen_v, num_heads_k, head_size]
+
+    head_size = q.shape[-1]
 
     # Define scaling factor
     scaling_factor = 1.0 / math.sqrt(head_size)
@@ -172,10 +180,10 @@ def loaded_out_closeness(out_load_flash, out_load_manual, manual_attn_out, flash
 if __name__ == "__main__":
 
     BATCH_SIZE = 1
-    seqlen_q = 64
-    seqlen_k = 64
-    num_heads = 16
-    head_size = 128
+    # seqlen_q = 8
+    # seqlen_k = 8
+    # num_heads = 1
+    # head_size = 8
     is_causal = True
 
     # Check if CUDA is available
@@ -184,7 +192,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # Set common tolerance levels for all comparisons
-    atol_val = 1e-2 
+    atol_val = 1e-2
     rtol_val = 1e-2
     print(f"Using comparison tolerances: atol={atol_val}, rtol={rtol_val}")
 
@@ -197,8 +205,11 @@ if __name__ == "__main__":
     v = torch.jit.load(root_path + "/v.pt")
     v = list(v.parameters())[0]
     out_load_flash = torch.jit.load(root_path + "/flash_out.pt")
+    out_load_mha_fwd = torch.jit.load(root_path + "/mha_fwd_out.pt")
     out_load_flash = list(out_load_flash.parameters())[0]
     out_load_flash = out_load_flash.permute(0, 2, 1, 3)
+    out_load_mha_fwd = list(out_load_mha_fwd.parameters())[0]
+    out_load_mha_fwd = out_load_mha_fwd.permute(0, 2, 1, 3)
     out_load_manual = torch.jit.load(root_path + "/torch_out.pt")
     out_load_manual = list(out_load_manual.parameters())[0]
     out_load_manual = out_load_manual.permute(0, 2, 1, 3)
@@ -214,6 +225,7 @@ if __name__ == "__main__":
     flash_attn_out, flash_softmax_lse = flash_attention(q, k, v, is_causal)
 
     print("attn_out_load_flash[0][0][0][0]:", out_load_flash[0][0][0][0])
+    print("attn_out_mha_fwd[0][0][0][0]:", out_load_mha_fwd[0][0][0][0])
     print("attn_out_load_manual[0][0][0][0]:", out_load_manual[0][0][0][0])
     print("attn_out_manual[0][0][0][0]:", manual_attn_out[0][0][0][0])
     print("attn_out_torch[0][0][0][0]:", torch_attn_out[0][0][0][0])
@@ -226,6 +238,21 @@ if __name__ == "__main__":
     softmax_lse_closeness(manual_softmax_lse, flash_softmax_lse)
 
     loaded_out_closeness(out_load_flash, out_load_manual, manual_attn_out, flash_attn_out)
+
+    # compare out_load_flash vs out_load_mha_fwd
+    comparison_result = torch.allclose(out_load_flash, out_load_mha_fwd, atol=atol_val, rtol=rtol_val)
+    print("out_load_flash == out_load_mha_fwd:", comparison_result)
+
+    if not comparison_result:
+        max_diff = torch.max(torch.abs(out_load_flash - out_load_mha_fwd))
+        print("Maximum absolute difference:", max_diff.item())
+    
+    print("out_load_flash: ", out_load_flash)
+    print("out_load_mha_fwd: ", out_load_mha_fwd)
+    print("out_load_manual: ", out_load_manual)
+    print("manual_attn_out: ", manual_attn_out)
+    print("torch_attn_out: ", torch_attn_out)
+    print("flash_attn_out: ", flash_attn_out)
 
 
 

@@ -180,12 +180,6 @@ if __name__ == "__main__":
     torch_attn_out = torch_built_in_attention(q, k, v, is_causal)    
     flash_attn_out, flash_softmax_lse = flash_attention(q, k, v, is_causal)
 
-
     attn_out_closeness(manual_attn_out, torch_attn_out, flash_attn_out)
     softmax_lse_closeness(manual_softmax_lse, flash_softmax_lse)
-
-
-
-
-    
 

@@ -51,13 +51,16 @@ void torch_attention_forward_matmul(
     // Handle causal mask properly
     if (is_causal)
     {
-        auto mask = at::tril(at::full({seqlen_q, seqlen_k}, -std::numeric_limits<float>::infinity(), q.options()));
+        // Fill the upper triangle with -inf (excluding the diagonal)
+        auto mask = torch::zeros({seqlen_q, seqlen_k}, q.options());
+        mask = torch::triu(mask, /*diagonal=*/1).masked_fill(torch::triu(torch::ones({seqlen_q, seqlen_k}, q.options()), 1) == 1, -std::numeric_limits<float>::infinity());
         scores = scores + mask.unsqueeze(0).unsqueeze(0);
+        std::cout << "mask: " << mask << std::endl;
     }
 
     // Compute softmax
     // auto attn_weights = torch::softmax(scores, -1);
-    auto max_scores = std::get<0>(scores.max(-1, true));  // Max per row for stability
+    auto max_scores = std::get<0>(scores.max(-1, true)); // Max per row for stability
     auto exp_scores = (scores - max_scores).exp();
     auto sum_exp_scores = exp_scores.sum(-1, true);
     auto attn_weights = exp_scores / sum_exp_scores;
@@ -106,14 +109,14 @@ int main()
         std::cout << "CUDA available: " << torch::cuda::is_available() << std::endl;
         std::cout << "CUDNN available: " << torch::cuda::cudnn_is_available() << std::endl;
 
-        int batch_size = 1, seqlen_q = 64, seqlen_k = 64;
-        int num_heads = 16, num_heads_k = 16, head_size = 128;
+        int batch_size = 1, seqlen_q = 2, seqlen_k = 2;
+        int num_heads = 1, num_heads_k = 1, head_size = 8;
         float p_dropout = 0.1f, softmax_scale = 1.0 / sqrt(head_size), softcap = 0.0f;
         bool return_softmax = false, is_causal = true;
         int window_size_left = -1, window_size_right = -1;
         // add alibi slopes. ALiBi slopes must have dtype fp32
-        at::Tensor alibi_slopes = at::randn({batch_size, num_heads}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
-        std::optional<at::Tensor> alibi_slopes_ = alibi_slopes;
+        // at::Tensor alibi_slopes = at::randn({batch_size, num_heads}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        std::optional<at::Tensor> alibi_slopes_ = std::nullopt;
         std::optional<at::Tensor> out_ = std::nullopt;
         std::optional<at::Generator> gen_ = std::nullopt;
 
@@ -137,6 +140,20 @@ int main()
         torch::save(q.clone().detach(), "q.pt");
         torch::save(k.clone().detach(), "k.pt");
         torch::save(v.clone().detach(), "v.pt");
+
+        // Forward pass
+        std::vector<at::Tensor> mha_fwd_output;
+        mha_fwd_output = flash::mha_fwd(q, k, v, out_, alibi_slopes_,
+                                    p_dropout, softmax_scale, is_causal,
+                                    window_size_left, window_size_right,
+                                    softcap, return_softmax, gen_);
+        auto mha_fwd_out = mha_fwd_output[0];
+        auto mha_fwd_softmax_lse = mha_fwd_output[1];
+        // save tensor to file
+        torch::save(mha_fwd_out.clone().detach(), "mha_fwd_out.pt");
+        torch::save(mha_fwd_softmax_lse.clone().detach(), "mha_fwd_softmax_lse.pt");
+
+        
 
         if (window_size_left >= seqlen_k)
         {
