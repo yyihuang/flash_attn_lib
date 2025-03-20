@@ -634,6 +634,9 @@ int main()
                                                     p_dropout, softmax_scale, is_causal,
                                                     window_size_left, window_size_right,
                                                     softcap, deterministic, gen_, rng_state, stream);
+            dq_ = mha_bwd_output[0];
+            dk_ = mha_bwd_output[1];
+            dv_ = mha_bwd_output[2];
             torch::save(dq_.value().clone().detach(), "run_mha_bwd_dq_cpp.pt");
             torch::save(dk_.value().clone().detach(), "run_mha_bwd_dk_cpp.pt");
             torch::save(dv_.value().clone().detach(), "run_mha_bwd_dv_cpp.pt");
