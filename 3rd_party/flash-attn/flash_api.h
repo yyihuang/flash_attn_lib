@@ -415,4 +415,12 @@ namespace flash
                 CHECK_CUDA(cudaDeviceGetAttribute(&multiprocessor_count, cudaDevAttrMultiProcessorCount, device));
                 return multiprocessor_count;
         }
+
+        inline std::tuple<int, int> get_compute_capability(int device)
+        {
+                int capability_major, capability_minor;
+                CHECK_CUDA(cudaDeviceGetAttribute(&capability_major, cudaDevAttrComputeCapabilityMajor, device));
+                CHECK_CUDA(cudaDeviceGetAttribute(&capability_minor, cudaDevAttrComputeCapabilityMinor, device));
+                return {capability_major, capability_minor};
+        }
 }

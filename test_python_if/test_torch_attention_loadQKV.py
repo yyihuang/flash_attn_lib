@@ -347,8 +347,8 @@ if __name__ == "__main__":
     
     # compare backward pass output from manual, torch, and flash attention in py
     grad_closeness_test(flash_dq_py, flash_dk_py, flash_dv_py, torch_dq_py, torch_dk_py, torch_dv_py, mha_bwd_dq_cpp, mha_bwd_dk_cpp, mha_bwd_dv_cpp, run_mha_bwd_dq_cpp, run_mha_bwd_dk_cpp, run_mha_bwd_dv_cpp, atol_val, rtol_val)
+
 '''
-(flash) [yingyih@catalyst-0-15 flash_attention_lib]$ python3 /home/yingyih/workspace/flash-attn-integration/flash_attention_lib/test_python_if/test_torch_attention_loadQKV.py
 Using device: cuda
 Using comparison tolerances: atol=0.001, rtol=0.001
 q.shape: torch.Size([1, 64, 8, 128])
@@ -360,31 +360,31 @@ flash_out_py.shape: torch.Size([1, 8, 64, 128])
 manual_out_cpp.shape: torch.Size([1, 8, 64, 128])
 mha_out_cpp.shape: torch.Size([1, 8, 64, 128])
 run_mha_fwd_out_cpp.shape: torch.Size([1, 8, 64, 128])
-manual_out_py.shape: torch.Size([1, 8, 64, 128])
 manual_out_py == run_mha_fwd_out_cpp: False
 Maximum absolute difference: 0.001953125
-touch_out_py.shape: torch.Size([1, 8, 64, 128])
 touch_out_py == run_mha_fwd_out_cpp: True
-flash_out_py.shape: torch.Size([1, 8, 64, 128])
 flash_out_py == run_mha_fwd_out_cpp: True
-manual_out_cpp.shape: torch.Size([1, 8, 64, 128])
 manual_out_cpp == run_mha_fwd_out_cpp: False
 Maximum absolute difference: 0.001953125
-mha_out_cpp.shape: torch.Size([1, 8, 64, 128])
 mha_out_cpp == run_mha_fwd_out_cpp: True
 manual_softmax_lse_py.shape: torch.Size([1, 8, 64])
 flash_softmax_lse_py.shape: torch.Size([1, 8, 64])
 manual_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
 mha_fwd_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
 run_mha_fwd_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
-manual_softmax_lse_py.shape: torch.Size([1, 8, 64])
 manual_softmax_lse_py == run_mha_fwd_softmax_lse_cpp: True
-flash_softmax_lse_py.shape: torch.Size([1, 8, 64])
 flash_softmax_lse_py == run_mha_fwd_softmax_lse_cpp: True
-manual_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
 manual_softmax_lse_cpp == run_mha_fwd_softmax_lse_cpp: True
-mha_fwd_softmax_lse_cpp.shape: torch.Size([1, 8, 64])
 mha_fwd_softmax_lse_cpp == run_mha_fwd_softmax_lse_cpp: True
+flash_dq_py == run_mha_bwd_dq_cpp: True
+torch_dq_py == run_mha_bwd_dq_cpp: True
+mha_bwd_dq_cpp == run_mha_bwd_dq_cpp: True
+flash_dk_py == run_mha_bwd_dk_cpp: True
+torch_dk_py == run_mha_bwd_dk_cpp: True
+mha_bwd_dk_cpp == run_mha_bwd_dk_cpp: True
+flash_dv_py == run_mha_bwd_dv_cpp: True
+torch_dv_py == run_mha_bwd_dv_cpp: True
+mha_bwd_dv_cpp == run_mha_bwd_dv_cpp: True
 '''
 
 
