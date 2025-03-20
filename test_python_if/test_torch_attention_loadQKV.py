@@ -2,6 +2,9 @@ import torch
 import math
 from flash_attn import flash_attn_func
 
+# load q, k, v tensor from file
+# compute attention from my kernel, torch attention, and flash attention library
+
 # q: [batch_size, seqlen_q, num_heads, head_size]
 # k: [batch_size, seqlen_k, num_heads_k, head_size]
 # v: [batch_size, seqlen_v, num_heads_k, head_size]
@@ -26,6 +29,9 @@ def torch_manual_attention(q, k, v, is_causal):
 
     # Compute attention weights
     attn_scores = q_permuted @ k_t * scaling_factor  # Use multiplication instead of division
+
+    # save the first checkpoint tensor
+    torch.save(attn_scores, "manual_attn_scores.pt")
 
     # Apply the causal mask by setting masked positions to a large negative value
     # This will make them effectively zero after softmax

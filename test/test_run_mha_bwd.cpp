@@ -8,6 +8,90 @@
 #include <iostream>
 #include "flash_api.h"
 
+void torch_attention_forward_matmul(
+    at::Tensor const &q, // shape: [batch_size, seqlen_q, num_heads, head_size]
+    at::Tensor const
+        &k, // shape: [batch_size, seqlen_k, num_heads_k, head_size]
+    at::Tensor const
+        &v, // shape: [batch_size, seqlen_k, num_heads_k, head_size]
+    at::Tensor const
+        &out, // shape: [batch_size, seqlen_q, num_heads, head_size]
+    at::Tensor const
+        &softmax_lse, // shape: [batch_size, num_heads, seqlen_q, 1]
+    bool is_causal)
+{
+    // Get shape
+    auto batch_size = q.size(0);
+    auto seqlen_q = q.size(1);
+    auto num_heads = q.size(2);
+    auto head_size = q.size(3);
+    auto seqlen_k = k.size(1);
+    auto num_heads_k = k.size(2);
+    assert(head_size == k.size(3));
+
+    // Clone input tensors to avoid modifying them
+    auto q_compute = q.clone();
+    auto k_compute = k.clone();
+    auto v_compute = v.clone();
+
+    // Permute Q, K, V to [batch_size, num_heads, seqlen, head_size]
+    q_compute = q_compute.permute({0, 2, 1, 3});
+    k_compute = k_compute.permute({0, 2, 1, 3});
+    v_compute = v_compute.permute({0, 2, 1, 3});
+
+    // Compute attention scores: q * k_t
+    // q: [batch_size, num_heads, seqlen_q, head_size]
+    // k: [batch_size, num_heads_k, seqlen_k, head_size]
+    // k_t: [batch_size, num_heads_k, head_size, seqlen_k]
+    auto k_t = k_compute.transpose(-2, -1);
+    // scores: [batch_size, num_heads, seqlen_q, seqlen_k]
+    float softmax_scale = 1.0 / std::sqrt(head_size);
+    auto scores = torch::matmul(q_compute, k_t) * softmax_scale;
+
+    // Handle causal mask properly
+    if (is_causal)
+    {
+        auto mask = at::tril(at::full({seqlen_q, seqlen_k}, -std::numeric_limits<float>::infinity(), q.options()));
+        scores = scores + mask.unsqueeze(0).unsqueeze(0);
+    }
+
+    // Compute softmax
+    // auto attn_weights = torch::softmax(scores, -1);
+    auto max_scores = std::get<0>(scores.max(-1, true));  // Max per row for stability
+    auto exp_scores = (scores - max_scores).exp();
+    auto sum_exp_scores = exp_scores.sum(-1, true);
+    auto attn_weights = exp_scores / sum_exp_scores;
+
+    // Compute attention output
+    auto torch_out = torch::matmul(attn_weights, v_compute);
+
+    // Reorder torch_out to [batch_size, seqlen_q, num_heads, head_size]
+    torch_out = torch_out.permute({0, 2, 1, 3});
+
+    // closeness check
+    auto out_fp32 = out.to(torch::kFloat32);
+    auto torch_out_fp32 = torch_out.to(torch::kFloat32);
+    auto diff = (out_fp32 - torch_out_fp32);
+    auto max_diff = diff.abs().max().item<float>();
+    std::cout << "Max difference between Flash Attention and PyTorch attention "
+                 "outputs: "
+              << max_diff << std::endl;
+    torch::save(out.clone().detach(), "flash_out.pt");
+    torch::save(torch_out.clone().detach(), "torch_out.pt");
+    std::cout << "out[0][0][0][0]: " << out[0][0][0][0] << std::endl;
+    std::cout << "torch_out[0][0][0][0]: " << torch_out[0][0][0][0] << std::endl;
+    // std::cout << "diff: " << diff[0][0][0] << std::endl;
+
+    if (max_diff > 1e-3)
+    {
+        // print the shape of out and torch_out
+        std::cout << "flash_out.shape: " << out.sizes() << std::endl;
+        std::cout << "torch_out.shape: " << torch_out.sizes() << std::endl;
+        std::cout << "Warning: Large difference detected in attention outputs!"
+                  << std::endl;
+    }
+}
+
 // To pass raw data pointer (on-device) to at::Tensor interface without copying
 // Refer this: torch::from_blob
 // https://pytorch.org/cppdocs/api/function_namespacetorch_1ad7fb2a7759ef8c9443b489ddde494787.html
@@ -16,14 +100,14 @@
 int main()
 {
     torch::manual_seed(42);
-    
+
     try
     {
         std::cout << "CUDA available: " << torch::cuda::is_available() << std::endl;
         std::cout << "CUDNN available: " << torch::cuda::cudnn_is_available() << std::endl;
 
-        int batch_size = 2, seqlen_q = 32, seqlen_k = 64;
-        int num_heads = 16, num_heads_k = 8, head_size = 128;
+        int batch_size = 1, seqlen_q = 64, seqlen_k = 64;
+        int num_heads = 16, num_heads_k = 16, head_size = 128;
         float p_dropout = 0.1f, softmax_scale = 1.0 / sqrt(head_size), softcap = 0.0f;
         bool return_softmax = false, is_causal = true;
         int window_size_left = -1, window_size_right = -1;
@@ -50,6 +134,9 @@ int main()
         std::cout << "Q Tensor Shape: " << q.sizes() << std::endl;
         std::cout << "K Tensor Shape: " << k.sizes() << std::endl;
         std::cout << "V Tensor Shape: " << v.sizes() << std::endl;
+        torch::save(q.clone().detach(), "q.pt");
+        torch::save(k.clone().detach(), "k.pt");
+        torch::save(v.clone().detach(), "v.pt");
 
         if (window_size_left >= seqlen_k)
         {
@@ -125,22 +212,22 @@ int main()
 
         flash::Flash_fwd_params fwd_params;
         flash::set_params_fprop(fwd_params,
-                         batch_size,
-                         seqlen_q, seqlen_k,
-                         seqlen_q_rounded, seqlen_k_rounded,
-                         num_heads, num_heads_k,
-                         head_size, head_size_rounded,
-                         q, k, v, out,
-                         /*cu_seqlens_q_d=*/nullptr,
-                         /*cu_seqlens_k_d=*/nullptr,
-                         /*seqused_k=*/nullptr,
-                         return_softmax ? p.data_ptr() : nullptr,
-                         softmax_lse.data_ptr(),
-                         p_dropout,
-                         softmax_scale,
-                         window_size_left,
-                         window_size_right,
-                         softcap);
+                                batch_size,
+                                seqlen_q, seqlen_k,
+                                seqlen_q_rounded, seqlen_k_rounded,
+                                num_heads, num_heads_k,
+                                head_size, head_size_rounded,
+                                q, k, v, out,
+                                /*cu_seqlens_q_d=*/nullptr,
+                                /*cu_seqlens_k_d=*/nullptr,
+                                /*seqused_k=*/nullptr,
+                                return_softmax ? p.data_ptr() : nullptr,
+                                softmax_lse.data_ptr(),
+                                p_dropout,
+                                softmax_scale,
+                                window_size_left,
+                                window_size_right,
+                                softcap);
 
         // Keep references to these tensors to extend their lifetime
         at::Tensor softmax_lse_accum, out_accum;
@@ -188,11 +275,13 @@ int main()
         }
 
         // out should have shape (batch_size, seqlen_q, num_heads, head_size)
-        std::cout << "Output Tensor Shape: " << out.sizes() << std::endl;
-        std::cout << "out: " << out << std::endl;
+        // std::cout << "Output Tensor Shape: " << out.sizes() << std::endl;
+        // std::cout << "out: " << out << std::endl;
 
-        std::cout << "Softmax LSE Shape: " << softmax_lse.sizes() << std::endl;
-        std::cout << "softmax_lse: " << softmax_lse << std::endl;   
+        // std::cout << "Softmax LSE Shape: " << softmax_lse.sizes() << std::endl;
+        // std::cout << "softmax_lse: " << softmax_lse << std::endl;
+
+        torch_attention_forward_matmul(q, k, v, out, softmax_lse, is_causal);
 
         // ========================================================================================================
         // Backward Pass: Create dout, ensuring alignment with PyTorch behavior
@@ -276,29 +365,29 @@ int main()
         flash::Flash_bwd_params bwd_params;
 
         flash::set_params_dgrad(bwd_params,
-                         batch_size,
-                         seqlen_q, seqlen_k,
-                         seqlen_q_rounded, seqlen_k_rounded,
-                         num_heads, num_heads_k,
-                         head_size, head_size_rounded,
-                         q, k, v, out,
-                         dout, dq, dk_expanded, dv_expanded,
-                         nullptr,
-                         nullptr,
-                         loop ? dq_accum.data_ptr() : nullptr,
-                         // loop ? dk_accum.data_ptr() : nullptr,
-                         // loop ? dv_accum.data_ptr() : nullptr,
-                         nullptr,
-                         nullptr,
-                         softmax_lse.data_ptr(),
-                         softmax_d.data_ptr(),
-                         p_dropout,
-                         softmax_scale,
-                         window_size_left,
-                         window_size_right,
-                         softcap,
-                         deterministic,
-                         /*unpadded_lse*/ false);
+                                batch_size,
+                                seqlen_q, seqlen_k,
+                                seqlen_q_rounded, seqlen_k_rounded,
+                                num_heads, num_heads_k,
+                                head_size, head_size_rounded,
+                                q, k, v, out,
+                                dout, dq, dk_expanded, dv_expanded,
+                                nullptr,
+                                nullptr,
+                                loop ? dq_accum.data_ptr() : nullptr,
+                                // loop ? dk_accum.data_ptr() : nullptr,
+                                // loop ? dv_accum.data_ptr() : nullptr,
+                                nullptr,
+                                nullptr,
+                                softmax_lse.data_ptr(),
+                                softmax_d.data_ptr(),
+                                p_dropout,
+                                softmax_scale,
+                                window_size_left,
+                                window_size_right,
+                                softcap,
+                                deterministic,
+                                /*unpadded_lse*/ false);
         bwd_params.dq_accum_split_stride = !deterministic ? 0 : dq_accum.stride(0);
 
         auto launch = &flash::run_mha_bwd;
@@ -355,13 +444,12 @@ int main()
         // }
 
         // Print the size of dq, dk, dv and their values
-        std::cout << "dq Tensor Shape: " << dq.sizes() << std::endl;
-        std::cout << "dq: " << dq << std::endl;
-        std::cout << "dk Tensor Shape: " << dk.sizes() << std::endl;
-        std::cout << "dk: " << dk << std::endl;
-        std::cout << "dv Tensor Shape: " << dv.sizes() << std::endl;
-        std::cout << "dv: " << dv << std::endl;
-
+        // std::cout << "dq Tensor Shape: " << dq.sizes() << std::endl;
+        // std::cout << "dq: " << dq << std::endl;
+        // std::cout << "dk Tensor Shape: " << dk.sizes() << std::endl;
+        // std::cout << "dk: " << dk << std::endl;
+        // std::cout << "dv Tensor Shape: " << dv.sizes() << std::endl;
+        // std::cout << "dv: " << dv << std::endl;
     }
     catch (const c10::Error &e)
     {
