@@ -146,10 +146,10 @@ def softmax_lse_closeness(manual_softmax_lse, flash_softmax_lse):
 if __name__ == "__main__":
 
     BATCH_SIZE = 1
-    seqlen_q = 10
-    seqlen_k = 10
-    num_heads = 12
-    head_size = 64
+    seqlen_q = 64
+    seqlen_k = 64
+    num_heads = 16
+    head_size = 128
     is_causal = True
 
     # Check if CUDA is available
