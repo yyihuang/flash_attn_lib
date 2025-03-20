@@ -160,37 +160,6 @@ int main()
         torch::save(k.clone().detach(), "k.pt");
         torch::save(v.clone().detach(), "v.pt");
 
-        // test mha_fwd and mha_bwd interface
-        { // Forward pass: mha_fwd
-            std::vector<at::Tensor> mha_fwd_output;
-            mha_fwd_output = flash::mha_fwd(q, k, v, out_, alibi_slopes_,
-                                            p_dropout, softmax_scale, is_causal,
-                                            window_size_left, window_size_right,
-                                            softcap, return_softmax, gen_);
-            auto mha_fwd_out = mha_fwd_output[0];
-            auto mha_fwd_softmax_lse = mha_fwd_output[1];
-            auto S_dmask = mha_fwd_output[2];
-            std::optional<at::Tensor> rng_state = mha_fwd_output[3];
-            // save tensor to file
-            torch::save(mha_fwd_out.clone().detach(), "mha_fwd_out_cpp.pt");
-            torch::save(mha_fwd_softmax_lse.clone().detach(), "mha_fwd_softmax_lse_cpp.pt");
-
-            // Backward pass: mha_bwd
-            at::Tensor dout = torch::randn_like(mha_fwd_out);
-            std::optional<at::Tensor> dq_ = torch::empty_like(q);
-            std::optional<at::Tensor> dk_ = torch::empty_like(k);
-            std::optional<at::Tensor> dv_ = torch::empty_like(v);
-            bool deterministic = false;
-            std::vector<at::Tensor> mha_bwd_output;
-            flash::mha_bwd(dout, q, k, v, mha_fwd_out, mha_fwd_softmax_lse, dq_, dk_, dv_, alibi_slopes_,
-                                            p_dropout, softmax_scale, is_causal,
-                                            window_size_left, window_size_right,
-                                            softcap, deterministic, gen_, rng_state);
-            torch::save(dq_.value().clone().detach(), "mha_bwd_dq_cpp.pt");
-            torch::save(dk_.value().clone().detach(), "mha_bwd_dk_cpp.pt");
-            torch::save(dv_.value().clone().detach(), "mha_bwd_dv_cpp.pt");
-        }
-
         if (window_size_left >= seqlen_k)
         {
             window_size_left = -1;
@@ -341,6 +310,7 @@ int main()
         // ========================================================================================================
         at::Tensor dq, dk, dv;
         at::Tensor dout = torch::randn_like(out);
+        torch::save(dout.clone().detach(), "dout.pt");
         std::optional<at::Tensor> dq_ = std::nullopt;
         std::optional<at::Tensor> dk_ = std::nullopt;
         std::optional<at::Tensor> dv_ = std::nullopt;
@@ -507,6 +477,37 @@ int main()
         // std::cout << "dk: " << dk << std::endl;
         // std::cout << "dv Tensor Shape: " << dv.sizes() << std::endl;
         // std::cout << "dv: " << dv << std::endl;
+
+        // test mha_fwd and mha_bwd interface
+        { // Forward pass: mha_fwd
+            std::vector<at::Tensor> mha_fwd_output;
+            mha_fwd_output = flash::mha_fwd(q, k, v, out_, alibi_slopes_,
+                                            p_dropout, softmax_scale, is_causal,
+                                            window_size_left, window_size_right,
+                                            softcap, return_softmax, gen_);
+            auto mha_fwd_out = mha_fwd_output[0];
+            auto mha_fwd_softmax_lse = mha_fwd_output[1];
+            auto S_dmask = mha_fwd_output[2];
+            std::optional<at::Tensor> rng_state = mha_fwd_output[3];
+            // save tensor to file
+            torch::save(mha_fwd_out.clone().detach(), "mha_fwd_out_cpp.pt");
+            torch::save(mha_fwd_softmax_lse.clone().detach(), "mha_fwd_softmax_lse_cpp.pt");
+
+            // Backward pass: mha_bwd
+            // at::Tensor dout = torch::randn_like(mha_fwd_out);
+            std::optional<at::Tensor> dq_ = torch::empty_like(q);
+            std::optional<at::Tensor> dk_ = torch::empty_like(k);
+            std::optional<at::Tensor> dv_ = torch::empty_like(v);
+            bool deterministic = false;
+            std::vector<at::Tensor> mha_bwd_output;
+            flash::mha_bwd(dout, q, k, v, mha_fwd_out, mha_fwd_softmax_lse, dq_, dk_, dv_, alibi_slopes_,
+                           p_dropout, softmax_scale, is_causal,
+                           window_size_left, window_size_right,
+                           softcap, deterministic, gen_, rng_state);
+            torch::save(dq_.value().clone().detach(), "mha_bwd_dq_cpp.pt");
+            torch::save(dk_.value().clone().detach(), "mha_bwd_dk_cpp.pt");
+            torch::save(dv_.value().clone().detach(), "mha_bwd_dv_cpp.pt");
+        }
     }
     catch (const c10::Error &e)
     {
