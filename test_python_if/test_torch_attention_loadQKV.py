@@ -337,13 +337,13 @@ if __name__ == "__main__":
 
     manual_attn_out, manual_softmax_lse = torch_manual_attention_fwd(q, k, v, is_causal)
     torch_attn_out, torch_dq_py, torch_dk_py, torch_dv_py = torch_built_in_attention(q, k, v, is_causal, dout)    
-    flash_attn_out, flash_softmax_lse, flash_dq_py, flash_dk_py, flash_dv_py = flash_attention(q, k, v, is_causal, dout)
+    flash_attn_out_py, flash_softmax_lse_py, flash_dq_py, flash_dk_py, flash_dv_py = flash_attention(q, k, v, is_causal, dout)
 
     # compare attention out in forward pass
-    attention_out_closeness_test(manual_attn_out, torch_attn_out, flash_attn_out, manual_out_cpp, mha_fwd_out_cpp, run_mha_fwd_out_cpp, atol_val, rtol_val)
+    attention_out_closeness_test(manual_attn_out, torch_attn_out, flash_attn_out_py, manual_out_cpp, mha_fwd_out_cpp, run_mha_fwd_out_cpp, atol_val, rtol_val)
     
     # compare softmax_lse in forward pass
-    softmax_lse_closeness_test(manual_softmax_lse, flash_softmax_lse, manual_softmax_lse_cpp, mha_fwd_softmax_lse_cpp, run_mha_fwd_softmax_lse_cpp, atol_val, rtol_val)    
+    softmax_lse_closeness_test(manual_softmax_lse, flash_softmax_lse_py, manual_softmax_lse_cpp, mha_fwd_softmax_lse_cpp, run_mha_fwd_softmax_lse_cpp, atol_val, rtol_val)    
     
     # compare backward pass output from manual, torch, and flash attention in py
     grad_closeness_test(flash_dq_py, flash_dk_py, flash_dv_py, torch_dq_py, torch_dk_py, torch_dv_py, mha_bwd_dq_cpp, mha_bwd_dk_cpp, mha_bwd_dv_cpp, run_mha_bwd_dq_cpp, run_mha_bwd_dk_cpp, run_mha_bwd_dv_cpp, atol_val, rtol_val)

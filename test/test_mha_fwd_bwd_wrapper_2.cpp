@@ -151,7 +151,7 @@ int main()
         std::cout << "CUDA available: " << torch::cuda::is_available() << std::endl;
         std::cout << "CUDNN available: " << torch::cuda::cudnn_is_available() << std::endl;
 
-        int batch_size = 1, seqlen_q = 64, seqlen_k = 64;
+        int batch_size = 1, seqlen_q = 64, seqlen_k = 128;
         int num_heads = 8, num_heads_k = 8, head_size = 128;
         float p_dropout = 0.0f, softmax_scale = 1.0f / sqrt(head_size), softcap = 0.0f;
         bool return_softmax = false, is_causal = true;
